@@ -20,7 +20,7 @@ object Dependencies {
     val jawn       = mkModule("jawn")
   }
 
-  val has = "io.github.anakos" %% "data-has" % "0.1.0" 
+  val has = "io.github.anakos" %% "data-has" % "0.1.1" 
 
   object ScalaCheck {
     val core      = "org.scalacheck" %% "scalacheck" % "1.14.3"

@@ -1,8 +1,9 @@
-package influxdb.types
+package influxdb.http.api
 
 import cats._
 import cats.syntax.eq._
 import cats.syntax.show._
+import io.circe.Decoder
 
 /**
  * This code was ported from scalaz using this version from scalaz:
@@ -26,6 +27,7 @@ object Either3 {
       override def show(v: Either3[A, B, C]) =
         v.fold(_.show, _.show, _.show)
     }
+
   implicit def eqv[A: Eq, B: Eq, C: Eq]: Eq[Either3[A, B, C]] =
     new Eq[Either3[A, B, C]] {
       override def eqv(e1: Either3[A, B, C], e2: Either3[A, B, C]) =
@@ -36,6 +38,11 @@ object Either3 {
           case _ => false
         }      
     }
+
+  implicit def decoder[A : Decoder, B: Decoder, C: Decoder]: Decoder[Either3[A,B,C]] =
+    Decoder[A].map(Either3.left3[A,B,C](_))
+      .or(Decoder[B].map(Either3.middle3[A,B,C](_)))
+      .or(Decoder[C].map(Either3.right3[A,B,C](_)))
 
   final case class Left3[A, B, C](a: A) extends Either3[A, B, C]
   final case class Middle3[A, B, C](b: B) extends Either3[A, B, C]

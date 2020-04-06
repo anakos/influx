@@ -6,13 +6,13 @@ import cats.syntax.applicativeError._
 import cats.syntax.flatMap._
 import cats.syntax.option._
 
-import influxdb.http.{api, Config, Handle}
+import influxdb.http.{Config, Handle}
 import influxdb.manage._
 import influxdb.manage.retention.Natural
 import influxdb.query
 import influxdb.write
-import influxdb.types._
-import influxdb.types.Parameter.{Consistency, Precision}
+import influxdb.write._
+import influxdb.write.Parameter.{Consistency, Precision}
 
 import org.specs2.execute._
 import org.specs2.mutable
@@ -102,7 +102,7 @@ class DatabaseSpec extends mutable.Specification with InfluxDbContext {
 
   "query" >> {
     "batch queries can be executed at the same time" >> {  handle: Handle =>
-      query.multi[Handle, api.SingleSeries](
+      query.multiSeries[Handle](
         query.Params.multiQuery(
           List("select * from subscriber limit 5", "select * from \"write\" limit 5")
           , "_internal"
@@ -130,7 +130,7 @@ class DatabaseSpec extends mutable.Specification with InfluxDbContext {
     "single point" >> { handle: Handle =>
       val action =
         write.execute[Handle](write.Params.default(dbName, Point.withDefaults("test_measurement").addField("value", 123))) >>
-          query.single[Handle, api.SingleSeries](query.Params.singleQuery("SELECT * FROM test_measurement", dbName))
+          query.series[Handle](query.Params.singleQuery("SELECT * FROM test_measurement", dbName))
 
       withDb(action).run(handle).unsafeRunSync() must beLike {
         case query.Result(series) =>
@@ -142,7 +142,7 @@ class DatabaseSpec extends mutable.Specification with InfluxDbContext {
       val withTag = Point.withDefaults("test_measurement").addField("value", 123).addTag("tag_key", "tag_value")
       val action  =
         write.execute[Handle](write.Params.default(dbName, withTag)) >>
-          query.single[Handle, api.SingleSeries](
+          query.series[Handle](
             query.Params.singleQuery("SELECT * FROM test_measurement WHERE tag_key='tag_value'", dbName)
           )
 
@@ -157,7 +157,7 @@ class DatabaseSpec extends mutable.Specification with InfluxDbContext {
       val point = Point.withDefaults("test_measurement", time).addField("value", 123)
       val action =
         write.execute[Handle](write.Params.default(dbName, point).withPrecision(Precision.MILLISECONDS)) >>
-          query.single[Handle, api.SingleSeries](
+          query.series[Handle](
             query.Params.singleQuery("SELECT * FROM test_measurement", dbName, Precision.MILLISECONDS)
           )
             
@@ -171,7 +171,7 @@ class DatabaseSpec extends mutable.Specification with InfluxDbContext {
       val point  = Point.withDefaults("test_measurement").addField("value", 123)
       val action =
         write.execute[Handle](write.Params.default(dbName, point).withConsistency(Consistency.ALL)) >>
-          query.single[Handle, api.SingleSeries](
+          query.series[Handle](
             query.Params.singleQuery("SELECT * FROM test_measurement", dbName)
           )
             
@@ -194,7 +194,7 @@ class DatabaseSpec extends mutable.Specification with InfluxDbContext {
             .withReplication(Natural.create(1).get)
         )
         _      <- write.execute[Handle](write.Params.default(dbName, point).withRetentionPolicy(retentionPolicyName))
-        result <- query.single[Handle, api.SingleSeries](
+        result <- query.series[Handle](
           query.Params.singleQuery(
             s"SELECT * FROM ${retentionPolicyName}.${measurementName}", dbName
           )
@@ -228,7 +228,7 @@ class DatabaseSpec extends mutable.Specification with InfluxDbContext {
 
       val action =
         write.execute[Handle](write.Params.bulk(dbName, points)) >>
-          query.single[Handle, api.SingleSeries](
+          query.series[Handle](
             query.Params.singleQuery("SELECT * FROM test_measurement", dbName)
           )
 

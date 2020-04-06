@@ -9,35 +9,35 @@ import influxdb.query
 import io.circe.generic.auto._
 
 object users {
-  def create[E: http.Has](username: String, password: String) =
+  def create[E: influxdb.Has](username: String, password: String) =
     exec[E, api.Statement](s"CREATE USER $username WITH PASSWORD '$password'")
       .void
 
-  def createClusterAdmin[E: http.Has](username: String, password: String) =
+  def createClusterAdmin[E: influxdb.Has](username: String, password: String) =
     exec[E, api.Statement](s"CREATE USER $username WITH PASSWORD '$password' WITH ALL PRIVILEGES")
       .void
   
-  def dropUser[E: http.Has](username: String) =
+  def dropUser[E: influxdb.Has](username: String) =
     exec[E, api.Statement](s"DROP USER $username")
       .void
 
-  def showUsers[E: http.Has]() =
-    query.single[E, api.SingleSeries](query.Params.singleQuery("SHOW USERS"))
+  def showUsers[E: influxdb.Has]() =
+    query.series[E](query.Params.singleQuery("SHOW USERS"))
 
-  def setUserPassword[E: http.Has](username: String, password: String) =
+  def setUserPassword[E: influxdb.Has](username: String, password: String) =
     exec[E, api.Statement]("SET PASSWORD FOR %s='%s'".format(username, password))
       .void
 
-  def grantPrivileges[E: http.Has](username: String, database: String, privilege: Privilege) =
+  def grantPrivileges[E: influxdb.Has](username: String, database: String, privilege: Privilege) =
     exec[E, api.Statement]("GRANT %s ON %s TO %s".format(privilege, database, username))
 
-  def revokePrivileges[E: http.Has](username: String, database: String, privilege: Privilege) =
+  def revokePrivileges[E: influxdb.Has](username: String, database: String, privilege: Privilege) =
     exec[E, api.Statement]("REVOKE %s ON %s FROM %s".format(privilege, database, username))
 
-  def makeClusterAdmin[E: http.Has](username: String) =
+  def makeClusterAdmin[E: influxdb.Has](username: String) =
     exec[E, api.Statement]("GRANT ALL PRIVILEGES TO %s".format(username))
 
-  def userIsClusterAdmin[E: http.Has](username: String) = {
+  def userIsClusterAdmin[E: influxdb.Has](username: String) = {
     showUsers[E]().map { result =>
       result.series
         .headOption

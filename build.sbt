@@ -2,12 +2,19 @@ import Dependencies._
 
 name := "influx"
 
+ThisBuild / publishTo := sonatypePublishToBundle.value
+
 inThisBuild(
   List(
     organization := "io.github.anakos",
     scalaVersion := "2.13.1",
+    homepage := Some(url("https://github.com/anakos/influx")),
+    scmInfo := Some(ScmInfo(url("https://github.com/anakos/influx"), "git@github.com:anakos/influx.git")),
+    developers := List(Developer("anakos", "Alexander Nakos", "anakos@gmail.com", url("https://github.com/anakos"))),
+    licenses += ("MIT", url("https://github.com/anakos/data-has/blob/master/LICENSE")),
+    publishMavenStyle := true,
     addCompilerPlugin("org.typelevel" % "kind-projector_2.13.1" % "0.11.0"),
-    addCompilerPlugin("com.olegpy"    %% "better-monadic-for" % "0.3.1")
+    addCompilerPlugin("com.olegpy"    %% "better-monadic-for" % "0.3.1"),
   )
 )
 
@@ -16,31 +23,14 @@ lazy val root = (project in file("."))
     publish         := {},
     publishLocal    := {},
     publishArtifact := false,
-    // libraryDependencies ++= List(
-    //   "org.asynchttpclient" % "async-http-client" % "2.11.0",
-    //    cats.core,
-    //    cats.effect,
-    //    has,
-    //    circe.core,
-    //    circe.generic,
-    //    circe.jawn,
-    //    cats.laws            % "it,test",
-    //    specs2.cats          % "it,test",
-    //    specs2.core          % "it,test",
-    //    specs2.discipline    % "it,test",
-    //    specs2.scalaCheck    % "it,test",
-    //    ScalaCheck.core      % "it,test",
-    //    ScalaCheck.shapeless % "it,test",
-    //    "com.github.tomakehurst" % "wiremock" % "2.26.3" % Test
-    // )
   )
-  .aggregate(core, `cats-ext`)
+  .aggregate(core, `cats-ext`, examples)
 
 lazy val core =
   mkProject("core")
     .settings(
       libraryDependencies ++= List(
-        "org.asynchttpclient" % "async-http-client" % "2.11.0",
+        "org.asynchttpclient"   % "async-http-client" % "2.11.0",
         circe.core,
         circe.generic,
         circe.jawn,
@@ -48,7 +38,7 @@ lazy val core =
         "com.github.tomakehurst" % "wiremock" % "2.26.3" % Test
       )
     )
-
+    
 lazy val `cats-ext` =
   mkProject("cats-ext")
     .configs(IntegrationTest)
@@ -60,6 +50,21 @@ lazy val `cats-ext` =
         specs2.core % IntegrationTest,
       )
     ).dependsOn(core)
+
+lazy val examples =
+  mkProject("examples")
+    .settings(
+      publish         := {},
+      publishLocal    := {},
+      publishArtifact := false,
+      libraryDependencies ++= List(
+        "org.slf4j"      %  "slf4j-api"       % "1.7.30",
+        "ch.qos.logback" %  "logback-classic" % "1.2.3",
+        "co.fs2"         %% "fs2-core"        % "2.3.0",
+        "co.fs2"         %% "fs2-io"          % "2.3.0"
+      )
+    )
+    .dependsOn(core, `cats-ext`)
 
 def mkProject(id: String) =
   Project(s"influxdb-$id", file(s"$id"))

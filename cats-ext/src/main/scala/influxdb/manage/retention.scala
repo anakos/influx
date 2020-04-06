@@ -12,20 +12,20 @@ import io.circe.generic.auto._
 
 // // Database
 object retention {
-  def createPolicy[E : http.Has](params: Params) =
+  def createPolicy[E : influxdb.Has](params: Params) =
     validate(params.buildCreatePolicy())
       .flatMap(query.single[E, api.Statement](_))
     
-  def showPolicies[E : http.Has](params: Params) =
-    query.single[E, api.SingleSeries](params.buildShowPolicy())
+  def showPolicies[E : influxdb.Has](params: Params) =
+    query.series[E](params.buildShowPolicy())
 
-  def dropPolicy[E : http.Has](params: Params) =
+  def dropPolicy[E : influxdb.Has](params: Params) =
     validate(params.buildDropPolicy())
       .flatMap { exec[E, api.Statement](_) }
 
-  def alterPolicy[E : http.Has](params: Params) =
+  def alterPolicy[E : influxdb.Has](params: Params) =
     validate(params.buildAlterPolicy())
-      .flatMap(query.single[E, api.SingleSeries](_))    
+      .flatMap(query.series[E](_))    
 
   private def validate[E, A](x: EitherNel[String, A]): RIO[E, A] =
     ReaderT.liftF(

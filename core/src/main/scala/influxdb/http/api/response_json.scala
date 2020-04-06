@@ -8,7 +8,6 @@ import cats.syntax.monadError._
 import cats.syntax.option._
 import cats.syntax.show._
 import cats.syntax.traverse._
-import influxdb.types.Either3
 import io.circe._
 
 final case class Failure(error: String) {
@@ -16,7 +15,7 @@ final case class Failure(error: String) {
     InfluxException.ServerError(error)
 }
 
-final case class Record(namesIndex: Map[String, Int], values: Vector[PrimitivePlus]) {
+final case class Record(namesIndex: Map[String, Int], values: Vector[Nullable]) {
   def apply(position: Int) = values(position)
   def apply(name: String) = values(namesIndex(name))
   def allValues = values
@@ -26,11 +25,11 @@ object Record {
     values
       .asRight[String]
       .ensure(s"could not create Record from mismatched number of columns (${names.length}) and values (${values.length})")(_.length == names.length)
-      .flatMap(_.traverse(_.as[PrimitivePlus]).leftMap(_.show))
+      .flatMap(_.traverse(_.as[Nullable]).leftMap(_.show))
       .map { values => Record(names.zipWithIndex.toMap, values) }
 }
 
-final case class Tags(tagsIndex: Map[String, Int], values: Vector[JsPrimitive]) {
+final case class Tags(tagsIndex: Map[String, Int], values: Vector[Value]) {
   def apply(position: Int) = values(position)
   def apply(name: String) = values(tagsIndex(name))
   def size: Int = tagsIndex.size
@@ -41,7 +40,7 @@ object Tags {
       val tagsIndex = js.keys.zipWithIndex.toMap
       js.values
         .toVector
-        .traverse[Either[DecodingFailure, ?], JsPrimitive] { _.as[JsPrimitive] }
+        .traverse[Either[DecodingFailure, ?], Value] { _.as[Value] }
         .bimap(
           _.show,
           values => Tags(tagsIndex, values)

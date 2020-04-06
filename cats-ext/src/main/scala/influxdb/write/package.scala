@@ -6,8 +6,8 @@ import influxdb.http
 import influxdb.http.HttpResponse
 
 package object write {
-  def execute[E : http.Has](params: Params): RIO[E, Unit] = 
-    http.post("/write", params.toMap(), params.points.map(_.serialize()).mkString("\n"))
+  def execute[E : influxdb.Has](params: Params): RIO[E, Unit] = 
+    http.post("/write", params.toMap(), params.points)
       .adaptError {
         case InfluxException.HttpException(msg, Some(x)) if x >= 400 && x < 500 =>
           InfluxException.ClientError(s"Error during write: $msg")

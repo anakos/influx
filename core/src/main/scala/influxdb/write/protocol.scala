@@ -1,5 +1,4 @@
-package influxdb
-package types
+package influxdb.write
 
 import cats.syntax.either._
 
@@ -53,29 +52,29 @@ sealed trait Field extends Product with Serializable {
 }
 object Field {
   final case class String(key: scala.Predef.String, value: scala.Predef.String) extends Field {
-    override def serialize() = escapeString(key) + "=\"" + value.replaceAll("\"", "\\\\\"") + "\""
+    override def serialize() = utils.escapeString(key) + "=\"" + value.replaceAll("\"", "\\\\\"") + "\""
   }
 
   final case class Double(key: scala.Predef.String, value: scala.Double) extends Field {
-    override def serialize() = s"${escapeString(key)}=$value"
+    override def serialize() = s"${utils.escapeString(key)}=$value"
   }
 
   final case class Long(key: scala.Predef.String, value: scala.Long) extends Field {
-    override def serialize() = s"${escapeString(key)}=${value}i"
+    override def serialize() = s"${utils.escapeString(key)}=${value}i"
   }
 
   final case class Boolean(key: scala.Predef.String, value: scala.Boolean) extends Field {
-    override def serialize() = s"${escapeString(key)}=$value"
+    override def serialize() = s"${utils.escapeString(key)}=$value"
   }
 
   final case class BigDecimal(key: scala.Predef.String, value: scala.BigDecimal) extends Field {
-    override def serialize() = s"${escapeString(key)}=$value"
+    override def serialize() = s"${utils.escapeString(key)}=$value"
   }
 }
 
 final case class Tag(key: String, value: String) {
   def serialize(): String =
-    s"${escapeString(key)}=${escapeString(value)}"
+    s"${utils.escapeString(key)}=${utils.escapeString(value)}"
 }
 object Tag {
   def mk(key: String, value: String): Either[String, Tag] =

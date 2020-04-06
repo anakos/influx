@@ -1,20 +1,17 @@
 package influxdb.write
 
 import cats.syntax.option._
-import influxdb.types._
-import influxdb.types.Parameter.Precision
-import influxdb.types.Parameter.Consistency
 
 final case class Params(
   dbName: String,
-  points: Seq[Point],
-  precision: Option[Precision],
-  consistency: Option[Consistency],
+  points: String,
+  precision: Option[Parameter.Precision],
+  consistency: Option[Parameter.Consistency],
   retentionPolicy: Option[String]
 ) { self =>
-  def withPrecision(precision: Precision): Params =
+  def withPrecision(precision: Parameter.Precision): Params =
     self.copy(precision = precision.some)
-  def withConsistency(consistency: Consistency): Params =
+  def withConsistency(consistency: Parameter.Consistency): Params =
     self.copy(consistency = consistency.some)
   def withRetentionPolicy(retentionPolicy: String): Params =
     self.copy(retentionPolicy = retentionPolicy.some)
@@ -27,7 +24,7 @@ final case class Params(
 }
 object Params {
   def default(dbName: String, point: Point): Params =
-    Params(dbName, List(point), none, none, none)
+    Params(dbName, point.serialize(), none, none, none)
   def bulk(dbName: String, points: List[Point]): Params =
-    Params(dbName, points, none, none, none)
+    Params(dbName, points.map(_.serialize()).mkString("\n"), none, none, none)
 }

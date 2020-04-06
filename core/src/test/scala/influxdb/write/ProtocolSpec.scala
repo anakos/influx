@@ -1,8 +1,8 @@
-package influxdb.types
+package influxdb.write
 
 import org.specs2.mutable
 
-class ModelSpec extends mutable.Specification {
+class ProtocolSpec extends mutable.Specification {
   "Point" >> {
     "serialize minimal point correctly" >> {
       val point = Point.withDefaults("key")

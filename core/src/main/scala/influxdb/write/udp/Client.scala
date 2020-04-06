@@ -3,7 +3,6 @@ package write
 package udp
 
 import cats.effect._
-import influxdb.types.Point
 import java.net.{DatagramPacket, DatagramSocket, InetSocketAddress}
 
 final class Client private[udp](socket: DatagramSocket, address: InetSocketAddress) {
