@@ -9,8 +9,7 @@ import influxdb.http
 import influxdb.http.Config
 import influxdb.manage.db
 import influxdb.query
-import influxdb.types._
-import influxdb.write.udp
+import influxdb.write._
 
 import org.specs2.execute._
 import org.specs2.mutable

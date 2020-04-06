@@ -11,8 +11,8 @@ import influxdb.manage._
 import influxdb.manage.retention.Natural
 import influxdb.query
 import influxdb.write
-import influxdb.types._
-import influxdb.types.Parameter.{Consistency, Precision}
+import influxdb.write._
+import influxdb.write.Parameter.{Consistency, Precision}
 
 import org.specs2.execute._
 import org.specs2.mutable

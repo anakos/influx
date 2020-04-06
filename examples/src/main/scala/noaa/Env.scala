@@ -15,19 +15,19 @@ final case class Env(
 )
 object Env {
   implicit val logger: Logger.Has[Env] =
-    has.Has.mk[Env, org.slf4j.Logger](_.logger)
+    has.Has.mk(_.logger)
 
   implicit val influx: influxdb.Has[Env] =
-    has.Has.mk[Env, Handle](_.influx)
+    has.Has.mk(_.influx)
 
   implicit val blocker: has.Has[Blocker, Env] =
-    has.Has.mk[Env, Blocker](_.blocker)
+    has.Has.mk(_.blocker)
 
   implicit val contextShift: has.Has[ContextShift[IO], Env] =
-    has.Has.mk[Env, ContextShift[IO]](_.cs)
+    has.Has.mk(_.cs)
 
   implicit val timer: has.Has[Timer[IO], Env] =
-    has.Has.mk[Env, Timer[IO]](_.timer)
+    has.Has.mk(_.timer)
 
   def create(host: String, port: Int, username: String, password: String): Resource[IO, Env] =
     for {

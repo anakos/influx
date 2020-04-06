@@ -38,7 +38,7 @@ lazy val core =
         "com.github.tomakehurst" % "wiremock" % "2.26.3" % Test
       )
     )
-
+    
 lazy val `cats-ext` =
   mkProject("cats-ext")
     .configs(IntegrationTest)
