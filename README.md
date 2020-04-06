@@ -45,7 +45,13 @@ https://docs.influxdata.com/influxdb/v1.7/query_language/data_download/
 
 See the accompanying README of that project for more information.
 
-# Future Development
+# Future Development / TODO
+
+## TODO
+
+add attribution where applicable.
+
+## Future Development
 
 This is very much a work in progress. I'd like to add / investigate the following:
 
