@@ -6,7 +6,7 @@ import cats.effect._
 import cats.syntax.apply._
 import cats.syntax.option._
 import influxdb.http
-import influxdb.http.{api, Config}
+import influxdb.http.Config
 import influxdb.manage.db
 import influxdb.query
 import influxdb.types._

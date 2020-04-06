@@ -6,7 +6,7 @@ import cats.syntax.applicativeError._
 import cats.syntax.flatMap._
 import cats.syntax.option._
 
-import influxdb.http.{api, Config, Handle}
+import influxdb.http.{Config, Handle}
 import influxdb.manage._
 import influxdb.manage.retention.Natural
 import influxdb.query
@@ -171,7 +171,7 @@ class DatabaseSpec extends mutable.Specification with InfluxDbContext {
       val point  = Point.withDefaults("test_measurement").addField("value", 123)
       val action =
         write.execute[Handle](write.Params.default(dbName, point).withConsistency(Consistency.ALL)) >>
-          query.single[Handle](
+          query.series[Handle](
             query.Params.singleQuery("SELECT * FROM test_measurement", dbName)
           )
             

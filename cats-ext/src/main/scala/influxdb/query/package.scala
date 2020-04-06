@@ -15,7 +15,7 @@ package object query {
       IO.fromEither(Result.extractSingle[A](content))
     }
 
-  def mutliSeries[E : influxdb.Has](params: Params): RIO[E, List[Result[http.api.SingleSeries]]] =
+  def multiSeries[E : influxdb.Has](params: Params): RIO[E, List[Result[http.api.SingleSeries]]] =
     multi[E, http.api.SingleSeries](params)
 
   def multi[E : influxdb.Has, A : Decoder](params: Params): RIO[E, List[Result[A]]] =

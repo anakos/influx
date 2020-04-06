@@ -4,7 +4,6 @@ package api
 
 import cats.syntax.option._
 import org.specs2.mutable
-import influxdb.types.Either3
 import io.circe._
 import io.circe.generic.auto._
 
@@ -32,10 +31,10 @@ class ResponseJsonSpec extends mutable.Specification {
       val Right(data) = jawn.decode[Vector[Json]]("""[1, "second value"]""")
       Record.create(Vector("first_metric", "second_metric"), data) must beRight[Record].like {
         case record =>
-          record(0) must_=== PrimitivePlus.fromNum(1)
-          record("first_metric") must_=== PrimitivePlus.fromNum(1)
-          record(1) must_=== PrimitivePlus.fromString("second value")
-          record("second_metric") must_=== PrimitivePlus.fromString("second value")
+          record(0) must_=== Nullable.fromNum(1)
+          record("first_metric") must_=== Nullable.fromNum(1)
+          record(1) must_=== Nullable.fromString("second value")
+          record("second_metric") must_=== Nullable.fromString("second value")
       }
     }
 
@@ -44,8 +43,8 @@ class ResponseJsonSpec extends mutable.Specification {
 
       Record.create(Vector("first_metric", "second_metric"), data) must beRight[Record].like {
         case record =>
-          record(1) must_=== PrimitivePlus.fromNull()
-          record("second_metric") must_=== PrimitivePlus.fromNull()
+          record(1) must_=== Nullable.fromNull()
+          record("second_metric") must_=== Nullable.fromNull()
       }
     }
 
@@ -67,9 +66,9 @@ class ResponseJsonSpec extends mutable.Specification {
           records.length must_=== 1
           records.headOption must beSome[Record].like {
             case record =>
-              record("column1") must_=== PrimitivePlus.fromString("value1")
-              record("column2") must_=== PrimitivePlus.fromNum(2)
-              record("column3") must_=== PrimitivePlus.fromBool(true)
+              record("column1") must_=== Nullable.fromString("value1")
+              record("column2") must_=== Nullable.fromNum(2)
+              record("column3") must_=== Nullable.fromBool(true)
               record.allValues.length must_=== 3
           }
       }
@@ -118,15 +117,15 @@ class ResponseJsonSpec extends mutable.Specification {
       """{"name":"n","columns":["column1", "column2"],"values":[[1, 2],[2, 3],[3, 4],[4, 5]]}"""
     ) must beRight[SingleSeries].like {   
       case series =>
-        series.points("column1") must_=== Vector(1, 2, 3, 4).map { PrimitivePlus.fromNum(_) }
-        series.points(0) must_=== Vector(1, 2, 3, 4).map { PrimitivePlus.fromNum(_) }
-        series.points("column2") must_=== Vector(2, 3, 4, 5).map { PrimitivePlus.fromNum(_) }
-        series.points(1) must_=== Vector(2, 3, 4, 5).map { PrimitivePlus.fromNum(_) }
+        series.points("column1") must_=== Vector(1, 2, 3, 4).map { Nullable.fromNum(_) }
+        series.points(0) must_=== Vector(1, 2, 3, 4).map { Nullable.fromNum(_) }
+        series.points("column2") must_=== Vector(2, 3, 4, 5).map { Nullable.fromNum(_) }
+        series.points(1) must_=== Vector(2, 3, 4, 5).map { Nullable.fromNum(_) }
         series.allValues must_=== Vector(
-          Vector(1, 2).map { PrimitivePlus.fromNum(_) },
-          Vector(2, 3).map { PrimitivePlus.fromNum(_) },
-          Vector(3, 4).map { PrimitivePlus.fromNum(_) },
-          Vector(4, 5).map { PrimitivePlus.fromNum(_) }
+          Vector(1, 2).map { Nullable.fromNum(_) },
+          Vector(2, 3).map { Nullable.fromNum(_) },
+          Vector(3, 4).map { Nullable.fromNum(_) },
+          Vector(4, 5).map { Nullable.fromNum(_) }
         )
     }
   }
@@ -137,8 +136,8 @@ class ResponseJsonSpec extends mutable.Specification {
         """{"columns":["column1", "column2", "column3"],"values":[["value1", 2, true]],"tags":{"tag": "value"}}"""
       ) must beRight[SingleSeries].like {
         case series =>
-          series.tags("tag") must_=== JsPrimitive.string("value")
-          series.tags(0) must_=== JsPrimitive.string("value")
+          series.tags("tag") must_=== Value.string("value")
+          series.tags(0) must_=== Value.string("value")
       }
     }
 
@@ -147,12 +146,12 @@ class ResponseJsonSpec extends mutable.Specification {
         """{"columns":["column1", "column2", "column3"],"values":[["value1", 2, true]],"tags":{"tag1": "value", "tag2": 10, "tag3": true}}"""
       ) must beRight[SingleSeries].like {
         case series =>
-          series.tags("tag1") must_=== JsPrimitive.string("value")
-          series.tags(0) must_=== JsPrimitive.string("value")
-          series.tags("tag2") must_=== JsPrimitive.num(10)
-          series.tags(1) must_=== JsPrimitive.num(10)
-          series.tags("tag3") must_=== JsPrimitive.bool(true)
-          series.tags(2) must_=== JsPrimitive.bool(true)
+          series.tags("tag1") must_=== Value.string("value")
+          series.tags(0) must_=== Value.string("value")
+          series.tags("tag2") must_=== Value.num(10)
+          series.tags(1) must_=== Value.num(10)
+          series.tags("tag3") must_=== Value.bool(true)
+          series.tags(2) must_=== Value.bool(true)
       }
     }
   }

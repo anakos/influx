@@ -14,7 +14,7 @@ This project is split between two modules:
 - core    : defines the core data structures for interacting with InfluxDb
 - cats-ext: extends the core with helper methods that interact with InfluxDb using `ReaderT over IO`. 
 
-This split structure should be considered a work in progress: the 2 modules may be merged into one.  
+This split structure should be considered a work in progress: the 2 modules may be merged into one.  I'm thinking about adding some hooks for ZIO
 
 ## Installation
 
@@ -26,3 +26,6 @@ libraryDependencies += "io.github.anakos" %% "influxdb-core" % "0.1.0"
 # if optionally using cats-ext
 libraryDependencies += "io.github.anakos" %% "influxdb-cats-ext" % "0.1.0"
 ```
+
+## Examples
+
