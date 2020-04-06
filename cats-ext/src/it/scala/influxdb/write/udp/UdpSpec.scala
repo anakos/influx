@@ -31,7 +31,7 @@ class UdpSpec extends mutable.Specification with InfluxUdpContext with IOMatcher
           Point.withDefaults("test_measurement").addField("value", 123).addTag("tag_key", "tag_value")
         )
         _       <- ReaderT.liftF(IO.sleep(1.second)) // to allow flushing to happen inside influx
-        results <- query.single[Env, api.SingleSeries](
+        results <- query.series[Env](
           query.Params.singleQuery("SELECT * FROM test_measurement", dbName)
         )
         _       <- db.drop[Env](dbName)
@@ -54,7 +54,7 @@ class UdpSpec extends mutable.Specification with InfluxUdpContext with IOMatcher
           Point.withDefaults("test_measurement", ts + 2).addField("value", 3).addTag("tag_key", "tag_value")
         ))
         _       <- Timer[RIO[Env, ?]].sleep(1.second) // to allow flushing to happen inside influx
-        results <- query.single[Env, api.SingleSeries](
+        results <- query.series[Env](
           query.Params.singleQuery("SELECT * FROM test_measurement", dbName)
         )
         _       <- db.drop[Env](dbName)

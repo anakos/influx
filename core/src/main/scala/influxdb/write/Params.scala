@@ -7,7 +7,7 @@ import influxdb.types.Parameter.Consistency
 
 final case class Params(
   dbName: String,
-  points: Seq[Point],
+  points: String,
   precision: Option[Precision],
   consistency: Option[Consistency],
   retentionPolicy: Option[String]
@@ -27,7 +27,7 @@ final case class Params(
 }
 object Params {
   def default(dbName: String, point: Point): Params =
-    Params(dbName, List(point), none, none, none)
+    Params(dbName, point.serialize(), none, none, none)
   def bulk(dbName: String, points: List[Point]): Params =
-    Params(dbName, points, none, none, none)
+    Params(dbName, points.map(_.serialize()).mkString("\n"), none, none, none)
 }
