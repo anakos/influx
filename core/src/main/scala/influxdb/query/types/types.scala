@@ -1,9 +1,13 @@
-package influxdb.http.api
+package influxdb
+package query.types
 
 import cats._
+import cats.instances.all._
 import cats.syntax.eq._
+import cats.syntax.either._
+import cats.syntax.option._
 import cats.syntax.show._
-import io.circe.Decoder
+import io.circe._
 
 /**
  * This code was ported from scalaz using this version from scalaz:
@@ -51,4 +55,66 @@ object Either3 {
   def left3[A, B, C](a: A):   Either3[A, B, C] = Left3(a)
   def middle3[A, B, C](b: B): Either3[A, B, C] = Middle3(b)
   def right3[A, B, C](c: C):  Either3[A, B, C] = Right3(c)
+}
+
+object Value {
+  def num(i: BigDecimal): Value = Either3.left3(i)
+  def string(s: String): Value = Either3.middle3(s)
+  def bool(b: Boolean): Value = Either3.right3(b)
+}
+
+final case class Nullable(unwrap: Option[Value]) {
+  def ifString[A](f: String => A): Option[A] =
+    unwrap.flatMap {
+      case Either3.Middle3(x) => f(x).some
+      case _ => none
+    }
+
+  def asString(): Option[String] =
+    ifString(identity)
+
+  def ifBool[A](f: Boolean => A): Option[A] =
+    unwrap.flatMap {
+      case Either3.Right3(x) => f(x).some
+      case _ => none
+    }
+
+  def asBool(): Option[Boolean] =
+    ifBool(identity)
+
+  def ifNum[A](f: BigDecimal => A): Option[A] =
+    unwrap.flatMap {
+      case Either3.Left3(x) => f(x).some
+      case _ => none
+    }
+
+  def asNum(): Option[BigDecimal] =
+    ifNum(identity)
+
+  def asLong(): Option[Long] =
+    asNum().flatMap(x => Either.catchNonFatal(x.toLongExact).toOption)
+
+  def asInt(): Option[Int] =
+    asNum().flatMap(x => Either.catchNonFatal(x.toIntExact).toOption)
+
+  def ifNull[A](a: => A): Option[A] =
+    unwrap.fold(a.some) { _ => none }
+
+  def asNull(): Option[Unit] =
+    ifNull(())
+  
+  override def toString() =
+    Show[Nullable].show(this)
+}
+object Nullable {
+  def fromNull(): Nullable = Nullable(none)
+  def fromNum(i: BigDecimal): Nullable = Nullable(Value.num(i).some)
+  def fromString(s: String) = Nullable(Value.string(s).some)
+  def fromBool(b: Boolean) = Nullable(Value.bool(b).some)
+
+  implicit val show: Show[Nullable] =
+    Show.show { _.unwrap.fold("null") { _.show } }
+
+  implicit val decoder: Decoder[Nullable] =
+    Decoder[Option[Value]].map(Nullable(_))
 }

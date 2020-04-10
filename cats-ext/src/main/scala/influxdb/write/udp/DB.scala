@@ -1,7 +1,8 @@
 package influxdb
 package write
+package udp
 
-package object udp {
+object DB {
   def write[E](point: Point)(implicit udp: HasUdp[E]): RIO[E, Unit] =
     udp.using(_.write(point))
 

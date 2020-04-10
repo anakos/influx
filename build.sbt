@@ -31,10 +31,12 @@ lazy val core =
     .settings(
       libraryDependencies ++= List(
         "org.asynchttpclient"   % "async-http-client" % "2.11.0",
+        "org.tpolecat"          %% "atto-core"        % "0.7.2",
         circe.core,
         circe.generic,
         circe.jawn,
         cats.laws                % Test,
+        cats.scalaCheck          % Test,
         "com.github.tomakehurst" % "wiremock" % "2.26.3" % Test
       )
     )

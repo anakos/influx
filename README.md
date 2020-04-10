@@ -11,7 +11,7 @@ The existing test suite has been replicated here as much as possible to validate
 
 # Motivation
 
-Working with InfluxDB on a recent project, I found myself want for a library that embraced functional constructs and integrated out of the box into my existing project structure.  
+Working with InfluxDB on a recent project, I found myself want for a library that embraced functional constructs and integrated (out of the box) with my existing project structure.  
 
 That library didn't exist so here we go.
 
@@ -49,7 +49,8 @@ See the accompanying README of that project for more information.
 
 ## TODO
 
-add attribution where applicable.
+1. add attribution where applicable.
+2. support chunked queries directly.
 
 ## Future Development
 
