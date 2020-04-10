@@ -25,7 +25,7 @@ object json {
   }
 
   /**
-    * parse response JSON. allows only Series data. will fail if encountering statements
+    * parse results JSON. uses lenient parsing to skip non-series data (ie - errors, statements, anything else).
     *
     * @param content
     * @return
@@ -94,6 +94,9 @@ object TagSet {
   def empty() = TagSet(ListMap.empty)
 }
 
+/**
+ * represents an error message direct from the server
+ */
 final case class Failure(error: String) {
   def toInfluxException(): InfluxException =
     InfluxException.ServerError(error)
