@@ -3,29 +3,29 @@ package manage
 
 import cats.data._
 import cats.effect._
-import cats.syntax.apply._
-import cats.syntax.either._
-import cats.syntax.option._
-import influxdb.http.api
-import influxdb.query
-import io.circe.generic.auto._
+import cats.instances.all._
+import cats.syntax.all._
+import influxdb.query.{DB, FieldValidator, QueryResults}
+import influxdb.query.types._
+import scala.concurrent.duration._
+import scala.collection.immutable.ListMap
 
-// // Database
+// Database
 object retention {
   def createPolicy[E : influxdb.Has](params: Params) =
     validate(params.buildCreatePolicy())
-      .flatMap(query.single[E, api.Statement](_))
+      .flatMap(DB.query_[E](_))
     
   def showPolicies[E : influxdb.Has](params: Params) =
-    query.series[E](params.buildShowPolicy())
+    DB.query[E, RetentionPolicy](params.buildShowPolicy())
 
   def dropPolicy[E : influxdb.Has](params: Params) =
     validate(params.buildDropPolicy())
-      .flatMap { exec[E, api.Statement](_) }
+      .flatMap { exec[E](_) }
 
   def alterPolicy[E : influxdb.Has](params: Params) =
     validate(params.buildAlterPolicy())
-      .flatMap(query.series[E](_))    
+      .flatMap(DB.query_[E](_))    
 
   private def validate[E, A](x: EitherNel[String, A]): RIO[E, A] =
     ReaderT.liftF(
@@ -33,16 +33,6 @@ object retention {
         x.leftMap(errs => InfluxException.ClientError(s"cmd validation failed with the following errors: ${errs.toList.mkString("|")}"))
       )
     )
-
-  final class Natural private(val value: Int) {
-    override def toString(): String =
-      value.toString()
-  }
-  object Natural {
-    def create(num: Int): Option[Natural] =
-      if (num < 0) None
-      else Some(new Natural(num))
-  }
 
   final case class Params(dbName: String, name: Option[String], duration: Option[String], replication: Option[Natural], defaultText: Option[String]) { self =>
     def withReplication(value: Natural): Params =
@@ -101,4 +91,32 @@ object retention {
   object Params {
     def create(dbName: String) = Params(dbName, none, none, none, none)
   }
+}
+
+sealed abstract class RetentionPolicy(
+    val name: String, 
+    val duration: FiniteDuration,
+    val shardGroupDuration: FiniteDuration,
+    val replicaN : Int
+) extends Product with Serializable
+object RetentionPolicy {
+  final case class DefaultPolicy(override val name: String, override val duration: FiniteDuration, override val shardGroupDuration: FiniteDuration, override val replicaN : Int) extends RetentionPolicy(name, duration, shardGroupDuration, replicaN)
+  final case class Policy(override val name: String, override val duration: FiniteDuration, override val shardGroupDuration: FiniteDuration, override val replicaN : Int) extends RetentionPolicy(name, duration, shardGroupDuration, replicaN)
+  
+  implicit val parser: QueryResults[RetentionPolicy] =
+    new QueryResults[RetentionPolicy] {
+      def parseWith(name  : Option[String],
+                    tags  : ListMap[String, Value],
+                    fields: ListMap[String, Nullable]): Either[String, RetentionPolicy] =
+        (FieldValidator.byName("name") { _.asString() },
+          FieldValidator.byName("duration") { _.asString() }.flatMapF(DurationLiteral.parse(_)),
+          FieldValidator.byName("shardGroupDuration") { _.asString() }.flatMapF(DurationLiteral.parse(_)),
+          FieldValidator.byName("replicaN") { _.asNum().flatMap(x => Either.catchNonFatal(x.toIntExact).toOption) },
+          FieldValidator.byName("default") { _.asBool() }).mapN { 
+            case (name, dur, sg, rep, true) => DefaultPolicy(name, dur.unwrap, sg.unwrap, rep)
+            case (name, dur, sg, rep, _)    => Policy(name, dur.unwrap, sg.unwrap, rep)
+          }
+          .run(fields)
+
+    }
 }

@@ -1,15 +1,15 @@
 package influxdb
 
-import cats.effect._
+import cats.syntax.functor._
 import influxdb.http
-import influxdb.http.HttpResponse
-import influxdb.query.Params
-import io.circe._
+import influxdb.query._
 
 package object manage {
-  def exec[E : influxdb.Has, A : Decoder](query: String): RIO[E, influxdb.query.Result[A]] =
-    http.post("/query", Params.singleQuery(query).toMap(), "")
-      .flatMapF { case HttpResponse(_, content) =>
-        IO.fromEither(influxdb.query.Result.extractSingle[A](content))
-      }
+  def exec[E : influxdb.Has](query: String): RIO[E, Unit] = {
+    val params = Params.singleQuery(query)
+
+    http.post("/query", params.toMap(), "")
+      .flatMapF { influxdb.query.DB.handleResponse[Unit](params) }
+      .void
+  }
 }

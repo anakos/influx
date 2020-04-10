@@ -1,12 +1,15 @@
 package influxdb
+package write
 
 import cats.syntax.functor._
 import cats.syntax.monadError._
+
 import influxdb.http
 import influxdb.http.HttpResponse
 
-package object write {
-  def execute[E : influxdb.Has](params: Params): RIO[E, Unit] = 
+object DB {
+  // WRITE
+  def write[E : influxdb.Has](params: Params): RIO[E, Unit] = 
     http.post("/write", params.toMap(), params.points)
       .adaptError {
         case InfluxException.HttpException(msg, Some(x)) if x >= 400 && x < 500 =>

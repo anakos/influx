@@ -1,5 +1,6 @@
 package influxdb.query
 
+import cats._
 import cats.syntax.option._
 import influxdb.write.Parameter.Precision
 
@@ -10,6 +11,9 @@ final case class Params(query: List[String], dbName: Option[String], precision: 
       dbName.map { d => "db" -> d }.toMap 
 }
 object Params {
+  implicit val show: Show[Params] =
+    Show.show(_.toMap().toList.mkString(" & "))
+    
   def singleQuery(query: String): Params =
     Params(List(query), none, none)
   def singleQuery(query: String, dbName: String): Params =

@@ -1,5 +1,5 @@
-package influxdb.http
+package influxdb.query
 
-package object api {
+package object types {
   type Value = Either3[BigDecimal, String, Boolean]
 }

@@ -6,7 +6,8 @@ import cats.effect.concurrent.Ref
 import cats.syntax.applicative._
 import cats.syntax.flatMap._
 import cats.syntax.option._
-import influxdb.write
+import influxdb.{write => Write}
+import influxdb.write.DB
 import java.io.InputStream
 import scala.concurrent.duration._
 
@@ -32,7 +33,7 @@ object SampleData {
     .filter(x => x.startsWith("h2o_") || x.startsWith("average_"))
 
   def writeBatch(counter: Ref[App, Long], dbName: String, points: fs2.Chunk[String]): App[Unit] =
-    write.execute[Env](write.Params(dbName, points.toList.mkString("\n"), none, none, none)) >>
+    DB.write[Env](Write.Params(dbName, points.toList.mkString("\n"), none, none, none)) >>
       counter.update(_ + points.size)
 
   def readIntoInflux(dbName: String): App[Long] =

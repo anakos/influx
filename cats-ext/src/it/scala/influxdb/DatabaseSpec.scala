@@ -1,35 +1,33 @@
 package influxdb
 
-import cats.effect._
 import cats.syntax.apply._
 import cats.syntax.applicativeError._
 import cats.syntax.flatMap._
-import cats.syntax.option._
 
-import influxdb.http.{Config, Handle}
+import influxdb.http.Handle
 import influxdb.manage._
-import influxdb.manage.retention.Natural
-import influxdb.query
-import influxdb.write
+import influxdb.query.{DB => ReadDB}
+import influxdb.write.{DB => WriteDB}
 import influxdb.write._
 import influxdb.write.Parameter.{Consistency, Precision}
 
-import org.specs2.execute._
 import org.specs2.mutable
-import org.specs2.matcher.IOMatchers
 
-class DatabaseSpec extends mutable.Specification with InfluxDbContext {
+import scala.concurrent.duration._
+
+class DatabaseSpec extends mutable.Specification with InfluxDbContext[Handle] {
   sequential
   
   override val dbName = "_test_database_db"
+
+  override val env = Handle.create(defaultConfig())
 
   "manage.db" >> {
     "show existing database" >> { handle: Handle =>
       withDb((db.exists[Handle](dbName), db.show[Handle]()).tupled)
         .run(handle).unsafeRunSync() must beLike {
-          case (exists, names) =>
-            exists must beTrue
-            names must contain(dbName)
+          case (true, names) =>
+            names must contain(DbName(dbName))
         }
     }
   }
@@ -48,8 +46,8 @@ class DatabaseSpec extends mutable.Specification with InfluxDbContext {
     
       result.run(handle).unsafeRunSync() must beLike {
         case (pre, post) =>
-          pre.series.head.points("user").flatMap(_.asString) must contain(username)
-          post.series.head.points("user").flatMap(_.asString) must not contain(username) 
+          pre.map(_.name) must contain(username)
+          post.map(_.name) must not contain(username) 
       }
     }
 
@@ -101,23 +99,25 @@ class DatabaseSpec extends mutable.Specification with InfluxDbContext {
   }
 
   "query" >> {
-    "batch queries can be executed at the same time" >> {  handle: Handle =>
-      query.multiSeries[Handle](
-        query.Params.multiQuery(
-          List("select * from subscriber limit 5", "select * from \"write\" limit 5")
-          , "_internal"
-        )
-      ).run(handle).unsafeRunSync() must beLike {
-        case List(query.Result(List(series1)), query.Result(List(series2))) =>
-          series1.name must_=== "subscriber"
-          series2.name must_=== "write"
+    "batch queries can be executed at the same time" >> { handle: Handle =>
+      val query1     = "select * from subscriber limit 5"
+      val query2     = """select * from "write" limit 5"""
+      val internalDB = "_internal"
+      
+      (ReadDB.query[Handle, MultiQueryExample](query.Params.multiQuery(List(query1, query2), internalDB)),
+          ReadDB.query[Handle, SubscriberInternal](query.Params.singleQuery(query1, internalDB)),
+          ReadDB.query[Handle, WriteInternal](query.Params.singleQuery(query2, internalDB)))
+        .tupled
+        .run(handle).unsafeRunSync() must beLike {
+        case (combined, results1, results2) =>
+          combined.size must_=== (results1.size + results2.size)
       }
     }    
   }
 
   "write" >> {
     "to a non-existent database yields DatabaseNotFoundException" >> { handle: Handle =>
-      write.execute[Handle](
+      WriteDB.write[Handle](
         write.Params.default(dbName, Point.withDefaults("test_measurement").addField("value", 123))
       )
       .run(handle)
@@ -129,26 +129,24 @@ class DatabaseSpec extends mutable.Specification with InfluxDbContext {
 
     "single point" >> { handle: Handle =>
       val action =
-        write.execute[Handle](write.Params.default(dbName, Point.withDefaults("test_measurement").addField("value", 123))) >>
-          query.series[Handle](query.Params.singleQuery("SELECT * FROM test_measurement", dbName))
+        WriteDB.write[Handle](write.Params.default(dbName, Point.withDefaults("test_measurement").addField("value", 123))) >>
+          ReadDB.query[Handle, TestMeasurement](query.Params.singleQuery("SELECT * FROM test_measurement", dbName))
 
       withDb(action).run(handle).unsafeRunSync() must beLike {
-        case query.Result(series) =>
-          series must have size 1
+        case series => series must have size 1
       }
     }
 
     "single point with tags" >> { handle: Handle =>
       val withTag = Point.withDefaults("test_measurement").addField("value", 123).addTag("tag_key", "tag_value")
       val action  =
-        write.execute[Handle](write.Params.default(dbName, withTag)) >>
-          query.series[Handle](
+        WriteDB.write[Handle](write.Params.default(dbName, withTag)) >>
+          ReadDB.query[Handle, TestMeasurement](
             query.Params.singleQuery("SELECT * FROM test_measurement WHERE tag_key='tag_value'", dbName)
           )
 
       withDb(action).run(handle).unsafeRunSync() must beLike {
-        case query.Result(series) =>
-          series must have size 1
+        case series => series must have size 1
       }
     }
 
@@ -156,28 +154,27 @@ class DatabaseSpec extends mutable.Specification with InfluxDbContext {
       val time  = 1444760421270L
       val point = Point.withDefaults("test_measurement", time).addField("value", 123)
       val action =
-        write.execute[Handle](write.Params.default(dbName, point).withPrecision(Precision.MILLISECONDS)) >>
-          query.series[Handle](
+        WriteDB.write[Handle](write.Params.default(dbName, point).withPrecision(Precision.MILLISECONDS)) >>
+          ReadDB.query[Handle, TestMeasurement](
             query.Params.singleQuery("SELECT * FROM test_measurement", dbName, Precision.MILLISECONDS)
           )
             
       withDb(action).run(handle).unsafeRunSync() must beLike {
-        case query.Result(List(series)) =>
-          series.records.head("time").ifNum(_.toLongExact).get must_=== time
+        case Vector(elem) =>
+          elem.time.toEpochMilli() must_=== time
       }
     }
 
     "single point with a consistency parameter" >> { handle: Handle =>
       val point  = Point.withDefaults("test_measurement").addField("value", 123)
       val action =
-        write.execute[Handle](write.Params.default(dbName, point).withConsistency(Consistency.ALL)) >>
-          query.series[Handle](
+        WriteDB.write[Handle](write.Params.default(dbName, point).withConsistency(Consistency.ALL)) >>
+          ReadDB.query[Handle, TestMeasurement](
             query.Params.singleQuery("SELECT * FROM test_measurement", dbName)
           )
             
       withDb(action).run(handle).unsafeRunSync() must beLike {
-        case query.Result(series) =>
-          series must have size(1)
+        case series => series must have size 1
       }
     }
 
@@ -193,8 +190,8 @@ class DatabaseSpec extends mutable.Specification with InfluxDbContext {
             .withDuration("1w")
             .withReplication(Natural.create(1).get)
         )
-        _      <- write.execute[Handle](write.Params.default(dbName, point).withRetentionPolicy(retentionPolicyName))
-        result <- query.series[Handle](
+        _      <- WriteDB.write[Handle](write.Params.default(dbName, point).withRetentionPolicy(retentionPolicyName))
+        result <- ReadDB.query[Handle, TestMeasurement](
           query.Params.singleQuery(
             s"SELECT * FROM ${retentionPolicyName}.${measurementName}", dbName
           )
@@ -202,8 +199,7 @@ class DatabaseSpec extends mutable.Specification with InfluxDbContext {
       } yield result 
       
       withDb(action).run(handle).unsafeRunSync must beLike {
-        case query.Result(series) =>
-          series must have size 1
+        case series => series must have size 1
       }
     }
 
@@ -213,7 +209,7 @@ class DatabaseSpec extends mutable.Specification with InfluxDbContext {
         Point.withDefaults("test_measurement").addField("value", 123)
       ).withRetentionPolicy("fake_retention_policy")
 
-      (db.create[Handle](dbName) >> write.execute[Handle](params).attempt)
+      (db.create[Handle](dbName) >> WriteDB.write[Handle](params).attempt)
         .run(handle)
         .unsafeRunSync() must beLeft
     }
@@ -227,14 +223,13 @@ class DatabaseSpec extends mutable.Specification with InfluxDbContext {
       )
 
       val action =
-        write.execute[Handle](write.Params.bulk(dbName, points)) >>
-          query.series[Handle](
+        WriteDB.write[Handle](write.Params.bulk(dbName, points)) >>
+          ReadDB.query[Handle, TestMeasurement](
             query.Params.singleQuery("SELECT * FROM test_measurement", dbName)
           )
 
       withDb(action).run(handle).unsafeRunSync() must beLike {
-        case query.Result(List(series)) =>
-          series.records must have size 3
+        case series => series must have size 3
       }
     }
   }
@@ -253,13 +248,10 @@ class DatabaseSpec extends mutable.Specification with InfluxDbContext {
         ) >> retention.showPolicies[Handle](retention.Params.create(dbName))
 
       withDb(action).run(handle).unsafeRunSync() must beLike {
-        case query.Result(series) =>
-          series.head.records must have size 2
-          val policy = series.head.records(1)
-          policy("name").asString must_=== retentionPolicyName.some
-          policy("duration").asString must_=== "168h0m0s".some
-          policy("replicaN").asNum must_=== BigDecimal(1).some
-          policy("default").asBool().getOrElse(false) must_=== true
+        case Vector(_, RetentionPolicy.DefaultPolicy(name, duration, _, replicaN)) =>
+          name must_=== retentionPolicyName
+          duration must_=== 168.hours
+          replicaN must_=== 1
       }
     }
 
@@ -278,8 +270,8 @@ class DatabaseSpec extends mutable.Specification with InfluxDbContext {
 
       withDb(action).run(handle).unsafeRunSync() must beLike {
         case (pre, post) =>
-          pre.series.head.records must have size 2
-          post.series.head.records must have size 1
+          pre must have size 2
+          post must have size 1
       }
     }
 
@@ -300,10 +292,10 @@ class DatabaseSpec extends mutable.Specification with InfluxDbContext {
       } yield result
 
       withDb(action).run(handle).unsafeRunSync() must beLike {
-        case query.Result(series) =>
-          val policy = series.head.records(1)
-          policy("name").asString must_=== retentionPolicyName.some
-          policy("duration").asString must_=== "336h0m0s".some
+        case Vector(autogen, policy) =>
+          autogen.name must_=== "autogen"
+          policy.name must_=== retentionPolicyName
+          policy.duration must_=== 336.hours
       }
     }
 
@@ -324,10 +316,10 @@ class DatabaseSpec extends mutable.Specification with InfluxDbContext {
       } yield result
 
       withDb(action).run(handle).unsafeRunSync() must beLike {
-        case query.Result(series) =>
-          val policy = series.head.records(1)
-          policy("name").asString must_=== retentionPolicyName.some
-          policy("replicaN").asNum must_=== BigDecimal(2).some
+        case Vector(autogen, policy) =>
+          autogen.name must_=== "autogen"
+          policy.name must_=== retentionPolicyName
+          policy.replicaN must_=== 2
       }            
     }
 
@@ -348,10 +340,9 @@ class DatabaseSpec extends mutable.Specification with InfluxDbContext {
       } yield result
 
       withDb(action).run(handle).unsafeRunSync() must beLike {
-        case query.Result(series) =>
-          val policy = series.head.records(1)
-          policy("name").asString must_=== retentionPolicyName.some
-          policy("default").asBool().getOrElse(false) must beTrue
+        case Vector(autogen, RetentionPolicy.DefaultPolicy(name,_,_,_)) =>
+          autogen.name must_=== "autogen"
+          name must_=== retentionPolicyName
       }      
     }
 
@@ -374,28 +365,18 @@ class DatabaseSpec extends mutable.Specification with InfluxDbContext {
   }
 }
 
-trait InfluxDbContext extends org.specs2.specification.ForEach[Handle] with IOMatchers {
-  import cats.effect.syntax.bracket._
-
-  def dbName: String
-
-  override def foreach[R: AsResult](f: Handle => R): Result =
-    Handle
-      .create(
-        Config(
-          Config.Client.default(),
-          Config.Connect.http("localhost", 8086, "influx_user".some, "influx_password".some)
-        )
-      )
-      .use { x => IO(AsResult(f(x))) }
-      .unsafeRunSync()
-
-  def withDb[A](action: RIO[Handle, A]): RIO[Handle, A] =
-    db.create[Handle](dbName).bracket(_ => action) { _ => db.drop[Handle](dbName) }
-}
-
+//curl -vvv -XPOST "http://localhost:8086/query?u=influx_user&p=influx_password&db=_test_database_db" --data-urlencode "q=SELECT * FROM test_measurement"
+//curl "http://localhost:8086/query?u=influx_user&p=influx_password&db=mydb" --data-urlencode "q=SHOW RETENTION POLICIES"
 // curl -vvv -XPOST "http://localhost:8086/query?u=influx_user&p=influx_password&db=_test_database_db" --data-urlencode "q=SELECT * FROM test_measurement"
 
 // curl -vvv -XPOST "http://localhost:8086/write?u=influx_user&p=influx_password&db=_test_database_db" --data-binary 'test_measurement,tag_key=tag_value value=123 1434055562000000000'
 
 // curl -i -XPOST 'http://localhost:8086/write?db=mydb' --data-binary 'cpu_load_short,host=server01,region=us-west value=0.64 1434055562000000000'
+
+
+// curl -vvv -XPOST "http://localhost:8086/query?u=influx_user&p=influx_password" --data-urlencode "q=CREATE DATABASE mydb"
+/**
+ * TODO:
+ * consider the following errors:
+ * {"results":[{"statement_id":0,"error":"database not found: mydb"}]}
+ * */

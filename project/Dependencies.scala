@@ -5,9 +5,10 @@ object Dependencies {
     def mkModule(name: String) =
       "org.typelevel" %% s"cats-${name}" % "2.1.1" withSources()
 
-    val core   = mkModule("core")
-    val effect = "org.typelevel" %% "cats-effect" % "2.1.2" withSources()
-    val laws   = mkModule("laws")
+    val core       = mkModule("core")
+    val effect     = "org.typelevel" %% "cats-effect" % "2.1.2" withSources()
+    val laws       = mkModule("laws")
+    val scalaCheck = "io.chrisdavenport" %% "cats-scalacheck" % "0.2.0"
   }  
 
   object circe {
