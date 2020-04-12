@@ -20,10 +20,10 @@ final case class Client[F[_]](
         .response(asStringAlways)
     )
 
-  def getChunked(path: String, params: Map[String, String])
+  def getChunked(path: String, params: Map[String, String], chunkSize: query.ChunkSize)
                  (implicit F: MonadError[F, Throwable]): F[HttpResponse.Chunked[F]] =
     executeRequest(
-      basicRequest.get(settings.mkUri(path, params))
+      basicRequest.get(settings.mkUri(path, params ++ chunkSize.params()))
         .response(asStreamAlways[fs2.Stream[F, java.nio.ByteBuffer]])
     )    
 

@@ -14,6 +14,7 @@ import influxdb.write.Parameter.{Consistency, Precision}
 import org.specs2.mutable
 
 import scala.concurrent.duration._
+import influxdb.query.ChunkSize
 
 class DatabaseSpec extends mutable.Specification with InfluxDbContext[HttpClient] {
   sequential
@@ -115,16 +116,26 @@ class DatabaseSpec extends mutable.Specification with InfluxDbContext[HttpClient
     }
     
     "chunked queries yield same data as non-chunked variants" >> { handle: HttpClient =>
-      val results = for {
-        _ <- WriteDB.write[HttpClient](
+      val action = for {
+        _         <- WriteDB.write[HttpClient](
           write.Params.bulk(
               dbName,
               (0L to 10000).map { x => Point.withDefaults("test_measurement").addField("value", x) }.toList
           )
         )
-      } yield ()
+        unchunked <- ReadDB.query[HttpClient, TestMeasurement](
+          query.Params.singleQuery("SELECT * FROM test_measurement", dbName)
+        )
+        chunked   <- ReadDB.queryChunked[HttpClient, TestMeasurement](
+          query.Params.singleQuery("SELECT * FROM test_measurement", dbName),
+          ChunkSize.withSize(Natural.create(1).get)
+        ).compile.toVector
+      } yield (unchunked, chunked)
 
-      results.run(handle).unsafeRunSync() must_=== ()
+      withDb(action).run(handle).unsafeRunSync() must beLike {
+        case (unchunked, chunked) =>
+          unchunked must_=== chunked
+      }
     }
   }
 

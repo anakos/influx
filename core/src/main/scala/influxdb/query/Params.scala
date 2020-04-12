@@ -3,6 +3,7 @@ package influxdb.query
 import cats._
 import cats.syntax.option._
 import influxdb.write.Parameter.Precision
+import influxdb.Natural
 
 final case class Params(query: List[String], dbName: Option[String], precision: Option[Precision]) {
   def toMap(): Map[String, String] =
@@ -31,4 +32,16 @@ object Params {
     Params(queries, none, precision.some)
   def multiQuery(queries: List[String], dbName: String, precision: Precision): Params =
     Params(queries, dbName.some, precision.some)
+}
+
+final case class ChunkSize(unwrap: Option[Natural]) {
+  def params(): Map[String, String] =
+    unwrap.fold(Map(ChunkSize.param)) { size => Map(ChunkSize.param, "chunk_size" -> size.toString())}    
+}
+object ChunkSize {
+  val param = "chunked" -> true.toString()
+
+  def default() = ChunkSize(none)
+  def withSize(value: Natural) =
+    ChunkSize(value.some)
 }

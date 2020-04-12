@@ -13,9 +13,9 @@ This module should provide all the necessary functionality for interacting with 
 
 # Dependencies
 
-cats / cats-effect
+cats / cats-effect / fs2
 circe
-async-http-client
+sttp
 
 ## JSON deserialization
 
