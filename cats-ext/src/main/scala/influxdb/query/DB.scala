@@ -35,28 +35,24 @@ object DB {
          .translate(LiftIO.liftK[RIO[E, ?]])
       }
   
-  private def executeChunked[E : influxdb.Has, A](params: Params, chunkSize: ChunkSize): RIO[E, HttpResponse.Chunked[IO]] =
-    http.getChunked[E]("/query", params.toMap(), chunkSize)
-      .adaptError {
-        case InfluxException.HttpException(msg, Some(x)) if x >= 400 && x < 500 =>
-          InfluxException.ClientError(s"Error during query: $msg")
-        case InfluxException.HttpException(msg, Some(x)) if x >= 500 && x < 600 =>
-          InfluxException.ServerError(s"Error during query: $msg")
-      }
+  private def executeChunked[E : influxdb.Has, A](params: Params, chunkSize: ChunkSize): RIO[E, HttpResponse.Chunked[RawBytes]] =
+    withErrorHandling(http.getChunked[E]("/query", params.toMap(), chunkSize))
 
   private def execute[E : influxdb.Has](params: Params): RIO[E, HttpResponse.Text] =
-    http.get("/query", params.toMap())
-      .adaptError {
-        case InfluxException.HttpException(msg, Some(x)) if x >= 400 && x < 500 =>
-          InfluxException.ClientError(s"Error during query: $msg")
-        case InfluxException.HttpException(msg, Some(x)) if x >= 500 && x < 600 =>
-          InfluxException.ServerError(s"Error during query: $msg")
-      }
+    withErrorHandling(http.get("/query", params.toMap()))
       
   def handleResponse[A : QueryResults](params: => Params)(response: HttpResponse.Text) =
     IO.fromEither {
       jawn.parse(response.content)
         .leftMap { InfluxException.unexpectedResponse(params, response.content, _) }
         .flatMap { JSON.parseQueryResult[A](_) }
+    }
+
+  private def withErrorHandling[E, A]: RIO[E, A] => RIO[E, A] =
+    _.adaptError {
+      case InfluxException.HttpException(msg, Some(x)) if x >= 400 && x < 500 =>
+        InfluxException.ClientError(s"Error during query: $msg")
+      case InfluxException.HttpException(msg, Some(x)) if x >= 500 && x < 600 =>
+        InfluxException.ServerError(s"Error during query: $msg")
     }
 }

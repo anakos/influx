@@ -4,7 +4,6 @@ import cats.syntax.apply._
 import cats.syntax.applicativeError._
 import cats.syntax.flatMap._
 
-import influxdb.http.Client
 import influxdb.manage._
 import influxdb.query.{DB => ReadDB}
 import influxdb.write.{DB => WriteDB}
@@ -21,7 +20,7 @@ class DatabaseSpec extends mutable.Specification with InfluxDbContext[HttpClient
   
   override val dbName = "_test_database_db"
 
-  override val env = Client.create(defaultConfig())
+  override val env = InfluxDB.create(defaultConfig())
 
   "manage.db" >> {
     "show existing database" >> { client: HttpClient =>

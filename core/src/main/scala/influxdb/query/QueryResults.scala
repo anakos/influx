@@ -8,7 +8,8 @@ import scala.collection.immutable.ListMap
 import influxdb.query.types._
 
 /**
-  * Conversions for types that be constructed from InfluxDB JSON series data.
+  * Conversions for types that are constructed from InfluxDB JSON series data.
+  * TODO: are tags still a thing?
   */
 trait QueryResults[A] {
   def parseWith(name  : Option[String],

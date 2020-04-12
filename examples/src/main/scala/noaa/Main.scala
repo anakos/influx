@@ -57,4 +57,11 @@ object Main extends IOApp {
     } yield ()
 }
 
-// curl -G 'http://localhost:8086/query' --data-urlencode "db=NOAA_water_database" --data-urlencode "chunked=true" --data-urlencode "chunk_size=20000" --data-urlencode "q=SELECT * FROM liters"
+/*
+curl -G 'http://localhost:8086/query' --data-urlencode "db=NOAA_water_database" \
+  --data-urlencode "chunked=true" \
+  --data-urlencode "chunk_size=20" \
+  --data-urlencode "u=influx_user" \
+  --data-urlencode "p=influx_password" \
+  --data-urlencode "q=SELECT * FROM h2o_feet"
+ */

@@ -13,7 +13,7 @@ This module should provide all the necessary functionality for interacting with 
 
 # Dependencies
 
-cats / cats-effect / fs2
+cats
 circe
 sttp
 

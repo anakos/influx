@@ -17,7 +17,7 @@ trait InfluxDbContext[Env] extends org.specs2.specification.ForEach[Env] with IO
 
   def defaultConfig(): http.Config =
     http.Config(
-      http.Config.Client.default().setRealm("influx_user".some, "influx_password".some),
+      http.Config.Client.default().setUserInfo("influx_user", "influx_password".some),
       http.Config.Connect.Http("localhost", 8086)
     )
 
