@@ -17,8 +17,8 @@ trait InfluxDbContext[Env] extends org.specs2.specification.ForEach[Env] with IO
 
   def defaultConfig(): http.Config =
     http.Config(
-      http.Config.Client.default(),
-      http.Config.Connect.http("localhost", 8086, "influx_user".some, "influx_password".some)
+      http.Config.Client.default().setRealm("influx_user".some, "influx_password".some),
+      http.Config.Connect.Http("localhost", 8086)
     )
 
   def withDb[A](action: RIO[Env, A])(implicit has: influxdb.Has[Env]): RIO[Env, A] =

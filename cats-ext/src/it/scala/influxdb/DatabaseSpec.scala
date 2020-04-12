@@ -4,7 +4,7 @@ import cats.syntax.apply._
 import cats.syntax.applicativeError._
 import cats.syntax.flatMap._
 
-import influxdb.http.Handle
+import influxdb.http.Client
 import influxdb.manage._
 import influxdb.query.{DB => ReadDB}
 import influxdb.write.{DB => WriteDB}
@@ -14,18 +14,19 @@ import influxdb.write.Parameter.{Consistency, Precision}
 import org.specs2.mutable
 
 import scala.concurrent.duration._
+import influxdb.query.ChunkSize
 
-class DatabaseSpec extends mutable.Specification with InfluxDbContext[Handle] {
+class DatabaseSpec extends mutable.Specification with InfluxDbContext[HttpClient] {
   sequential
   
   override val dbName = "_test_database_db"
 
-  override val env = Handle.create(defaultConfig())
+  override val env = Client.create(defaultConfig())
 
   "manage.db" >> {
-    "show existing database" >> { handle: Handle =>
-      withDb((db.exists[Handle](dbName), db.show[Handle]()).tupled)
-        .run(handle).unsafeRunSync() must beLike {
+    "show existing database" >> { client: HttpClient =>
+      withDb((db.exists[HttpClient](dbName), db.show[HttpClient]()).tupled)
+        .run(client).unsafeRunSync() must beLike {
           case (true, names) =>
             names must contain(DbName(dbName))
         }
@@ -36,12 +37,12 @@ class DatabaseSpec extends mutable.Specification with InfluxDbContext[Handle] {
     val username = "_test_username"
     val password = "test_password"
 
-    "create and drop" >> { handle: Handle =>
+    "create and drop" >> { handle: HttpClient =>
       val result = for {
-        _    <- users.create[Handle](username, password)
-        pre  <- users.showUsers[Handle]()
-        _    <- users.dropUser[Handle](username) 
-        post <- users.showUsers[Handle]()
+        _    <- users.create[HttpClient](username, password)
+        pre  <- users.showUsers[HttpClient]()
+        _    <- users.dropUser[HttpClient](username) 
+        post <- users.showUsers[HttpClient]()
       } yield (pre, post)
     
       result.run(handle).unsafeRunSync() must beLike {
@@ -51,11 +52,11 @@ class DatabaseSpec extends mutable.Specification with InfluxDbContext[Handle] {
       }
     }
 
-    "create cluster admin" >> { handle: Handle =>
+    "create cluster admin" >> { handle: HttpClient =>
       val result = for {
-        _       <- users.createClusterAdmin[Handle](username, password)
-        isAdmin <- users.userIsClusterAdmin[Handle](username)
-        _       <- users.dropUser[Handle](username) 
+        _       <- users.createClusterAdmin[HttpClient](username, password)
+        isAdmin <- users.userIsClusterAdmin[HttpClient](username)
+        _       <- users.dropUser[HttpClient](username) 
       } yield isAdmin
     
       result.run(handle).unsafeRunSync() must beLike {
@@ -63,13 +64,13 @@ class DatabaseSpec extends mutable.Specification with InfluxDbContext[Handle] {
       }
     }
 
-    "make cluster admin" >> { handle: Handle =>
+    "make cluster admin" >> { handle: HttpClient =>
       val result = for {
-        _           <- users.create[Handle](username, password)
-        isAdminPre  <- users.userIsClusterAdmin[Handle](username)
-        _           <- users.makeClusterAdmin[Handle](username)
-        isAdminPost <- users.userIsClusterAdmin[Handle](username)
-        _           <- users.dropUser[Handle](username) 
+        _           <- users.create[HttpClient](username, password)
+        isAdminPre  <- users.userIsClusterAdmin[HttpClient](username)
+        _           <- users.makeClusterAdmin[HttpClient](username)
+        isAdminPost <- users.userIsClusterAdmin[HttpClient](username)
+        _           <- users.dropUser[HttpClient](username) 
       } yield (isAdminPre, isAdminPost)
     
       result.run(handle).unsafeRunSync() must beLike {
@@ -79,18 +80,18 @@ class DatabaseSpec extends mutable.Specification with InfluxDbContext[Handle] {
       }
     }
 
-    "change passwords" >> { handle: Handle =>
-      (users.create[Handle](username, password) >>
-        users.setUserPassword[Handle](username, "new_password") >>
-        users.dropUser[Handle](username)).run(handle).attempt.unsafeRunSync() must beRight
+    "change passwords" >> { handle: HttpClient =>
+      (users.create[HttpClient](username, password) >>
+        users.setUserPassword[HttpClient](username, "new_password") >>
+        users.dropUser[HttpClient](username)).run(handle).attempt.unsafeRunSync() must beRight
     }
 
-    "grant/revoke user Privileges can be granted to and revoked from a user" >> { handle: Handle =>
-      (db.create[Handle](dbName) >>
-        users.create[Handle](username, password) >>
-        users.grantPrivileges[Handle](username, dbName, ALL) >>
-        users.revokePrivileges[Handle](username, dbName, WRITE) >>
-        db.drop[Handle](dbName)).run(handle).attempt.unsafeRunSync() must beRight
+    "grant/revoke user Privileges can be granted to and revoked from a user" >> { handle: HttpClient =>
+      (db.create[HttpClient](dbName) >>
+        users.create[HttpClient](username, password) >>
+        users.grantPrivileges[HttpClient](username, dbName, ALL) >>
+        users.revokePrivileges[HttpClient](username, dbName, WRITE) >>
+        db.drop[HttpClient](dbName)).run(handle).attempt.unsafeRunSync() must beRight
     }
 
     "passwords are correctly escaped" >> {
@@ -99,25 +100,48 @@ class DatabaseSpec extends mutable.Specification with InfluxDbContext[Handle] {
   }
 
   "query" >> {
-    "batch queries can be executed at the same time" >> { handle: Handle =>
+    "batch queries can be executed at the same time" >> { handle: HttpClient =>
       val query1     = "select * from subscriber limit 5"
       val query2     = """select * from "write" limit 5"""
       val internalDB = "_internal"
       
-      (ReadDB.query[Handle, MultiQueryExample](query.Params.multiQuery(List(query1, query2), internalDB)),
-          ReadDB.query[Handle, SubscriberInternal](query.Params.singleQuery(query1, internalDB)),
-          ReadDB.query[Handle, WriteInternal](query.Params.singleQuery(query2, internalDB)))
+      (ReadDB.query[HttpClient, MultiQueryExample](query.Params.multiQuery(List(query1, query2), internalDB)),
+          ReadDB.query[HttpClient, SubscriberInternal](query.Params.singleQuery(query1, internalDB)),
+          ReadDB.query[HttpClient, WriteInternal](query.Params.singleQuery(query2, internalDB)))
         .tupled
         .run(handle).unsafeRunSync() must beLike {
         case (combined, results1, results2) =>
           combined.size must_=== (results1.size + results2.size)
       }
-    }    
+    }
+    
+    "chunked queries yield same data as non-chunked variants" >> { handle: HttpClient =>
+      val action = for {
+        _         <- WriteDB.write[HttpClient](
+          write.Params.bulk(
+              dbName,
+              (0L to 10000).map { x => Point.withDefaults("test_measurement").addField("value", x) }.toList
+          )
+        )
+        unchunked <- ReadDB.query[HttpClient, TestMeasurement](
+          query.Params.singleQuery("SELECT * FROM test_measurement", dbName)
+        )
+        chunked   <- ReadDB.queryChunked[HttpClient, TestMeasurement](
+          query.Params.singleQuery("SELECT * FROM test_measurement", dbName),
+          ChunkSize.withSize(Natural.create(1).get)
+        ).compile.toVector
+      } yield (unchunked, chunked)
+
+      withDb(action).run(handle).unsafeRunSync() must beLike {
+        case (unchunked, chunked) =>
+          unchunked must_=== chunked
+      }
+    }
   }
 
   "write" >> {
-    "to a non-existent database yields DatabaseNotFoundException" >> { handle: Handle =>
-      WriteDB.write[Handle](
+    "to a non-existent database yields DatabaseNotFoundException" >> { handle: HttpClient =>
+      WriteDB.write[HttpClient](
         write.Params.default(dbName, Point.withDefaults("test_measurement").addField("value", 123))
       )
       .run(handle)
@@ -127,21 +151,21 @@ class DatabaseSpec extends mutable.Specification with InfluxDbContext[Handle] {
       }
     }
 
-    "single point" >> { handle: Handle =>
+    "single point" >> { handle: HttpClient =>
       val action =
-        WriteDB.write[Handle](write.Params.default(dbName, Point.withDefaults("test_measurement").addField("value", 123))) >>
-          ReadDB.query[Handle, TestMeasurement](query.Params.singleQuery("SELECT * FROM test_measurement", dbName))
+        WriteDB.write[HttpClient](write.Params.default(dbName, Point.withDefaults("test_measurement").addField("value", 123))) >>
+          ReadDB.query[HttpClient, TestMeasurement](query.Params.singleQuery("SELECT * FROM test_measurement", dbName))
 
       withDb(action).run(handle).unsafeRunSync() must beLike {
         case series => series must have size 1
       }
     }
 
-    "single point with tags" >> { handle: Handle =>
+    "single point with tags" >> { handle: HttpClient =>
       val withTag = Point.withDefaults("test_measurement").addField("value", 123).addTag("tag_key", "tag_value")
       val action  =
-        WriteDB.write[Handle](write.Params.default(dbName, withTag)) >>
-          ReadDB.query[Handle, TestMeasurement](
+        WriteDB.write[HttpClient](write.Params.default(dbName, withTag)) >>
+          ReadDB.query[HttpClient, TestMeasurement](
             query.Params.singleQuery("SELECT * FROM test_measurement WHERE tag_key='tag_value'", dbName)
           )
 
@@ -150,12 +174,12 @@ class DatabaseSpec extends mutable.Specification with InfluxDbContext[Handle] {
       }
     }
 
-    "single point with a precision parameter" >> { handle: Handle =>
+    "single point with a precision parameter" >> { handle: HttpClient =>
       val time  = 1444760421270L
       val point = Point.withDefaults("test_measurement", time).addField("value", 123)
       val action =
-        WriteDB.write[Handle](write.Params.default(dbName, point).withPrecision(Precision.MILLISECONDS)) >>
-          ReadDB.query[Handle, TestMeasurement](
+        WriteDB.write[HttpClient](write.Params.default(dbName, point).withPrecision(Precision.MILLISECONDS)) >>
+          ReadDB.query[HttpClient, TestMeasurement](
             query.Params.singleQuery("SELECT * FROM test_measurement", dbName, Precision.MILLISECONDS)
           )
             
@@ -165,11 +189,11 @@ class DatabaseSpec extends mutable.Specification with InfluxDbContext[Handle] {
       }
     }
 
-    "single point with a consistency parameter" >> { handle: Handle =>
+    "single point with a consistency parameter" >> { handle: HttpClient =>
       val point  = Point.withDefaults("test_measurement").addField("value", 123)
       val action =
-        WriteDB.write[Handle](write.Params.default(dbName, point).withConsistency(Consistency.ALL)) >>
-          ReadDB.query[Handle, TestMeasurement](
+        WriteDB.write[HttpClient](write.Params.default(dbName, point).withConsistency(Consistency.ALL)) >>
+          ReadDB.query[HttpClient, TestMeasurement](
             query.Params.singleQuery("SELECT * FROM test_measurement", dbName)
           )
             
@@ -178,20 +202,20 @@ class DatabaseSpec extends mutable.Specification with InfluxDbContext[Handle] {
       }
     }
 
-    "single point with a retention policy parameter" >> { handle: Handle =>
+    "single point with a retention policy parameter" >> { handle: HttpClient =>
       val retentionPolicyName = "custom_retention_policy"
       val measurementName     = "test_measurement"
       val point               = Point.withDefaults(measurementName).addField("value", 123)
       val action              = for {
-        _      <- retention.createPolicy[Handle](
+        _      <- retention.createPolicy[HttpClient](
           retention.Params
             .create(dbName)
             .withPolicyName(retentionPolicyName)
             .withDuration("1w")
             .withReplication(Natural.create(1).get)
         )
-        _      <- WriteDB.write[Handle](write.Params.default(dbName, point).withRetentionPolicy(retentionPolicyName))
-        result <- ReadDB.query[Handle, TestMeasurement](
+        _      <- WriteDB.write[HttpClient](write.Params.default(dbName, point).withRetentionPolicy(retentionPolicyName))
+        result <- ReadDB.query[HttpClient, TestMeasurement](
           query.Params.singleQuery(
             s"SELECT * FROM ${retentionPolicyName}.${measurementName}", dbName
           )
@@ -203,18 +227,18 @@ class DatabaseSpec extends mutable.Specification with InfluxDbContext[Handle] {
       }
     }
 
-    "fails when non-existent retention policy is specified" >> { handle: Handle =>
+    "fails when non-existent retention policy is specified" >> { handle: HttpClient =>
       val params  = write.Params.default(
         dbName,
         Point.withDefaults("test_measurement").addField("value", 123)
       ).withRetentionPolicy("fake_retention_policy")
 
-      (db.create[Handle](dbName) >> WriteDB.write[Handle](params).attempt)
+      (db.create[HttpClient](dbName) >> WriteDB.write[HttpClient](params).attempt)
         .run(handle)
         .unsafeRunSync() must beLeft
     }
 
-    "multiple points" >> { handle: Handle =>
+    "multiple points" >> { handle: HttpClient =>
       val time   = 1444760421000L
       val points = List(
         Point.withDefaults("test_measurement", time).addField("value", 123),
@@ -223,8 +247,8 @@ class DatabaseSpec extends mutable.Specification with InfluxDbContext[Handle] {
       )
 
       val action =
-        WriteDB.write[Handle](write.Params.bulk(dbName, points)) >>
-          ReadDB.query[Handle, TestMeasurement](
+        WriteDB.write[HttpClient](write.Params.bulk(dbName, points)) >>
+          ReadDB.query[HttpClient, TestMeasurement](
             query.Params.singleQuery("SELECT * FROM test_measurement", dbName)
           )
 
@@ -237,15 +261,15 @@ class DatabaseSpec extends mutable.Specification with InfluxDbContext[Handle] {
   "retention" >> {
     val retentionPolicyName = "test_retention_policy"
 
-    "create policy (default)" >> { handle: Handle =>
+    "create policy (default)" >> { handle: HttpClient =>
       val action =
-        retention.createPolicy[Handle](
+        retention.createPolicy[HttpClient](
           retention.Params.create(dbName)
             .withReplication(Natural.create(1).get)
             .withPolicyName(retentionPolicyName)
             .withDuration("1w")
             .useDefault()
-        ) >> retention.showPolicies[Handle](retention.Params.create(dbName))
+        ) >> retention.showPolicies[HttpClient](retention.Params.create(dbName))
 
       withDb(action).run(handle).unsafeRunSync() must beLike {
         case Vector(_, RetentionPolicy.DefaultPolicy(name, duration, _, replicaN)) =>
@@ -255,17 +279,17 @@ class DatabaseSpec extends mutable.Specification with InfluxDbContext[Handle] {
       }
     }
 
-    "create and delete policy" >> { handle: Handle =>
+    "create and delete policy" >> { handle: HttpClient =>
       val action = for {
-        _   <- retention.createPolicy[Handle](
+        _   <- retention.createPolicy[HttpClient](
           retention.Params.create(dbName)
             .withReplication(Natural.create(1).get)
             .withPolicyName(retentionPolicyName)
             .withDuration("1w")
         )
-        pre  <- retention.showPolicies[Handle](retention.Params.create(dbName))
-        _    <- retention.dropPolicy[Handle](retention.Params.create(dbName).withPolicyName(retentionPolicyName))
-        post <- retention.showPolicies[Handle](retention.Params.create(dbName))
+        pre  <- retention.showPolicies[HttpClient](retention.Params.create(dbName))
+        _    <- retention.dropPolicy[HttpClient](retention.Params.create(dbName).withPolicyName(retentionPolicyName))
+        post <- retention.showPolicies[HttpClient](retention.Params.create(dbName))
       } yield (pre, post)
 
       withDb(action).run(handle).unsafeRunSync() must beLike {
@@ -275,20 +299,20 @@ class DatabaseSpec extends mutable.Specification with InfluxDbContext[Handle] {
       }
     }
 
-    "alter policy duration" >> { handle: Handle =>
+    "alter policy duration" >> { handle: HttpClient =>
       val action = for {
-        _      <- retention.createPolicy[Handle](
+        _      <- retention.createPolicy[HttpClient](
           retention.Params.create(dbName)
             .withReplication(Natural.create(1).get)
             .withPolicyName(retentionPolicyName)
             .withDuration("1w")
         )
-        _      <- retention.alterPolicy[Handle](
+        _      <- retention.alterPolicy[HttpClient](
           retention.Params.create(dbName)
             .withPolicyName(retentionPolicyName)
             .withDuration("2w")
         )
-        result <- retention.showPolicies[Handle](retention.Params.create(dbName))
+        result <- retention.showPolicies[HttpClient](retention.Params.create(dbName))
       } yield result
 
       withDb(action).run(handle).unsafeRunSync() must beLike {
@@ -299,20 +323,20 @@ class DatabaseSpec extends mutable.Specification with InfluxDbContext[Handle] {
       }
     }
 
-    "alter policy replication" >> { handle: Handle =>
+    "alter policy replication" >> { handle: HttpClient =>
       val action = for {
-        _      <- retention.createPolicy[Handle](
+        _      <- retention.createPolicy[HttpClient](
           retention.Params.create(dbName)
             .withReplication(Natural.create(1).get)
             .withPolicyName(retentionPolicyName)
             .withDuration("1w")
         )
-        _      <- retention.alterPolicy[Handle](
+        _      <- retention.alterPolicy[HttpClient](
           retention.Params.create(dbName)
             .withPolicyName(retentionPolicyName)
             .withReplication(Natural.create(2).get)
         )
-        result <- retention.showPolicies[Handle](retention.Params.create(dbName))
+        result <- retention.showPolicies[HttpClient](retention.Params.create(dbName))
       } yield result
 
       withDb(action).run(handle).unsafeRunSync() must beLike {
@@ -323,20 +347,20 @@ class DatabaseSpec extends mutable.Specification with InfluxDbContext[Handle] {
       }            
     }
 
-    "alter policy defaultness" >> { handle: Handle =>
+    "alter policy defaultness" >> { handle: HttpClient =>
       val action = for {
-        _      <- retention.createPolicy[Handle](
+        _      <- retention.createPolicy[HttpClient](
           retention.Params.create(dbName)
             .withReplication(Natural.create(1).get)
             .withPolicyName(retentionPolicyName)
             .withDuration("1w")
         )
-        _      <- retention.alterPolicy[Handle](
+        _      <- retention.alterPolicy[HttpClient](
           retention.Params.create(dbName)
             .withPolicyName(retentionPolicyName)
             .useDefault()
         )
-        result <- retention.showPolicies[Handle](retention.Params.create(dbName))
+        result <- retention.showPolicies[HttpClient](retention.Params.create(dbName))
       } yield result
 
       withDb(action).run(handle).unsafeRunSync() must beLike {
@@ -346,15 +370,15 @@ class DatabaseSpec extends mutable.Specification with InfluxDbContext[Handle] {
       }      
     }
 
-    "at least one parameter has to be altered" >> { handle: Handle =>
+    "at least one parameter has to be altered" >> { handle: HttpClient =>
       val action = for {
-        _      <- retention.createPolicy[Handle](
+        _      <- retention.createPolicy[HttpClient](
           retention.Params.create(dbName)
             .withReplication(Natural.create(1).get)
             .withPolicyName(retentionPolicyName)
             .withDuration("1w")
         )
-        result <- retention.alterPolicy[Handle](retention.Params.create(dbName).withPolicyName(retentionPolicyName)).attempt
+        result <- retention.alterPolicy[HttpClient](retention.Params.create(dbName).withPolicyName(retentionPolicyName)).attempt
       } yield result
 
       withDb(action).run(handle).unsafeRunSync() must beLeft.like {

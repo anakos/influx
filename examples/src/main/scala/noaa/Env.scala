@@ -2,12 +2,12 @@ package noaa
 
 import cats.effect._
 import cats.syntax.option._
-import influxdb.http.{Config, Handle}
+import influxdb.http.{Config, Client}
 import org.slf4j.LoggerFactory
 import scala.concurrent.ExecutionContext
 
 final case class Env(
-  influx : influxdb.http.Handle,
+  influx : influxdb.HttpClient,
   logger : org.slf4j.Logger,
   blocker: cats.effect.Blocker,
   cs     : ContextShift[IO],
@@ -31,12 +31,12 @@ object Env {
 
   def create(host: String, port: Int, username: String, password: String): Resource[IO, Env] =
     for {
-      influx  <- Handle.create(
+      influx  <- Client.create(
         Config(
-          Config.Client.default(),
-          Config.Connect.http(host, port, username.some, password.some)
+          Config.Client.default().setRealm(username.some, password.some),
+          Config.Connect.Http(host, port)
         )        
-      )
+      )(IO.contextShift(ExecutionContext.global))
 
       logger  <- Resource.liftF(IO { LoggerFactory.getLogger("influxdb-examples") })
 
