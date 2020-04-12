@@ -5,7 +5,6 @@ import cats.data._
 import cats.effect._
 import cats.syntax.apply._
 
-import influxdb.http
 import influxdb.query
 import influxdb.query.{DB => ReadDB}
 import influxdb.write.Point
@@ -19,7 +18,7 @@ class UdpSpec extends mutable.Specification with InfluxDbContext[UdpSpec.Env] { 
   override val dbName: String = "_test_database_udp"
 
   override val env =
-    (http.Client.create(defaultConfig()), Client.create(Client.Config("localhost", 8086)))
+    (InfluxDB.create(defaultConfig()), create(Client.Config("localhost", 8086)))
       .mapN((_,_))
 
   "write" >> {
@@ -60,5 +59,5 @@ class UdpSpec extends mutable.Specification with InfluxDbContext[UdpSpec.Env] { 
   }
 }
 object UdpSpec {
-  type Env = (HttpClient, Client)
+  type Env = (HttpClient, UdpClient)
 }

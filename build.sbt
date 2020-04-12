@@ -30,17 +30,13 @@ lazy val core =
   mkProject("core")
     .settings(
       libraryDependencies ++= List(
-        "org.asynchttpclient"   % "async-http-client" % "2.11.0",
-        "org.tpolecat"          %% "atto-core"        % "0.7.2",
+        "org.tpolecat"           %% "atto-core"          % "0.7.2",
         circe.core,
         circe.generic,
         circe.jawn,
-        circe.fs2,
         sttp.core,
-        sttp.async_client,
-        sttp.async_client_cats,
-        sttp.async_client_fs2,
-        cats.laws                % Test,
+        sttp.async_client_fs2    % Test,
+        cats.effect              % Test,
         cats.scalaCheck          % Test,
         "com.github.tomakehurst" % "wiremock" % "2.26.3" % Test
       )
@@ -53,6 +49,11 @@ lazy val `cats-ext` =
       Defaults.itSettings,
       libraryDependencies ++= List(
         has,
+        cats.effect,
+        circe.fs2,
+        sttp.async_client,
+        sttp.async_client_cats,
+        sttp.async_client_fs2,
         specs2.cats % IntegrationTest,
         specs2.core % IntegrationTest,
       )
@@ -78,7 +79,6 @@ def mkProject(id: String) =
     .settings(
       libraryDependencies ++= List(        
         cats.core,
-        cats.effect,        
         specs2.cats          % Test,
         specs2.core          % Test,
         specs2.discipline    % Test,

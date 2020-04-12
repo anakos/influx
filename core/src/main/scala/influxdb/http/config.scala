@@ -1,54 +1,36 @@
 package influxdb.http
 
-import org.asynchttpclient.DefaultAsyncHttpClientConfig
-import org.asynchttpclient.Realm.{AuthScheme, Builder}
+import cats.syntax.option._
 import sttp.client._
 import sttp.model._
+import sttp.model.Uri.UserInfo
 
 final case class Config(client: Config.Client, connect: Config.Connect)
 object Config {
   def defaultHttp(host: String, port: Int): Config =
-    Config(Client.default(), Connect.Http(host, port)
-      // Connect.http(host, port, None, None)
-    )
+    Config(Client.default(), Connect.Http(host, port))
 
   def defaultHttps(host: String, port: Int): Config =
-    Config(Client.default(), Connect.Https(host, port)
-      // Connect.https(host, port, None, None)
-    )
+    Config(Client.default(), Connect.Https(host, port))
 
-  final class Client private[http](val builder: DefaultAsyncHttpClientConfig.Builder) {
-    def setConnectTimeout(timeout: Int) = {
-      builder.setConnectTimeout(timeout)
-      this
-    }
+  final case class Client private[http](connectTimeout      : Option[Int],
+                                        requestTimeout      : Option[Int],
+                                        acceptAnyCertificate: Boolean,
+                                        creds               : Option[sttp.model.Uri.UserInfo]) {
+    def setConnectTimeout(timeout: Int): Client =
+      this.copy(connectTimeout = timeout.some)
 
-    def setRequestTimeout(timeout: Int) = {
-      builder.setRequestTimeout(timeout)
-      this
-    }
+    def setRequestTimeout(timeout: Int): Client =
+      this.copy(requestTimeout = timeout.some)
 
-    def setAcceptAnyCertificate(acceptAnyCertificate: Boolean) = {
-      builder.setUseInsecureTrustManager(acceptAnyCertificate)
-      this
-    }
+    def setAcceptAnyCertificate(acceptAnyCertificate: Boolean): Client =
+      this.copy(acceptAnyCertificate = acceptAnyCertificate)
 
-    def setRealm(username: Option[String], password: Option[String]) = {
-      username.foreach { u =>
-        builder.setRealm(
-          new Builder(u, password.getOrElse(null))
-            .setUsePreemptiveAuth(true)
-            .setScheme(AuthScheme.BASIC)
-            .build()          
-        )
-      }
-      this
-    }
-
-    def build() = builder.build()
+    def setUserInfo(userName: String, password: Option[String]) =
+      this.copy(creds = UserInfo(userName, password).some)
   }
   object Client {
-    def default(): Client = new Client(new DefaultAsyncHttpClientConfig.Builder)
+    def default(): Client = Client(none, none, false, none)
   }
 
   sealed abstract class Connect(val host: String, val port: Int /*, val realm: Option[AuthRealm] */) { self =>

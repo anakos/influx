@@ -1,8 +1,6 @@
 package influxdb
 package http
 
-import cats.effect._
-// import cats.syntax.option._
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration
@@ -114,6 +112,11 @@ class ClientSpec extends mutable.Specification with AfterAll with IOMatchers {
   }
 }
 object ClientSpec {
+  import cats.effect._
+  import org.asynchttpclient.DefaultAsyncHttpClientConfig
+  import sttp.client.asynchttpclient.fs2.AsyncHttpClientFs2Backend
+  import sttp.client.impl.cats.implicits._
+  
   val path = "/query"
 
   lazy val defaultConfiguration: WireMockConfiguration =
@@ -131,7 +134,13 @@ object ClientSpec {
       .unsafeRunSync()
 
   def get(config: http.Config)(implicit cs: ContextShift[IO]): IO[Either[Throwable, HttpResponse[String]]] =
-    Client.create(config)
+    AsyncHttpClientFs2Backend.resourceUsingConfig[IO] {
+        val builder = new DefaultAsyncHttpClientConfig.Builder().setUseInsecureTrustManager(true)
+        
+        config.client.connectTimeout.fold(builder) { builder.setConnectTimeout(_) }
+          .build()
+      }
+      .map { new Client[IO, fs2.Stream[IO, java.nio.ByteBuffer]](config.connect, _) }
       .use { _.get(path, Map.empty) }
       .attempt
 }
