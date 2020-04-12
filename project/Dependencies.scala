@@ -15,10 +15,19 @@ object Dependencies {
     def mkModule(name: String) =
       "io.circe" %% s"circe-${name}" % "0.13.0"
 
-    val core       = mkModule("core")
-    val generic    = mkModule("generic")
-    val testing    = mkModule("testing")
-    val jawn       = mkModule("jawn")
+    val core    = mkModule("core")
+    val generic = mkModule("generic")
+    val testing = mkModule("testing")
+    val jawn    = mkModule("jawn")
+    val fs2     = mkModule("fs2")
+  }
+
+  object fs2 {
+    def mkModule(name: String) =
+      "co.fs2" %% s"fs2-$name" % "2.3.0"
+
+    val core = mkModule("core")
+    val io   = mkModule("io")
   }
 
   val has = "io.github.anakos" %% "data-has" % "0.1.1" 
@@ -37,5 +46,17 @@ object Dependencies {
     val core       = mkModule("core")
     val discipline = "org.typelevel" %% "discipline-specs2" % "1.0.0"
     val scalaCheck = mkModule("scalacheck")
+  }
+
+
+  object sttp {
+    def mkModule(name: String) =
+      "com.softwaremill.sttp.client" %% name % "2.0.7"
+
+    val core              = mkModule("core")
+    val async_client      = mkModule("async-http-client-backend")
+    val async_client_cats = mkModule("async-http-client-backend-cats")
+    val async_client_fs2  = mkModule("async-http-client-backend-fs2")
+    
   }
 }

@@ -9,7 +9,8 @@ import influxdb.manage.db
 object Main extends IOApp {
   override def run(args: List[String]): IO[ExitCode] =
     Env.create("localhost", 8086, "influx_user", "influx_password")
-      .use { withNoaaWaterDatabase(app).run(_) }
+      // .use { withNoaaWaterDatabase(app).run(_) }
+      .use { (db.create[Env](DEFAULT_DB_NAME) >> app).run(_) }
       .as(ExitCode.Success)
 
   def withNoaaWaterDatabase[A](action: App[A]): App[Unit] =
@@ -55,3 +56,5 @@ object Main extends IOApp {
 
     } yield ()
 }
+
+// curl -G 'http://localhost:8086/query' --data-urlencode "db=NOAA_water_database" --data-urlencode "chunked=true" --data-urlencode "chunk_size=20000" --data-urlencode "q=SELECT * FROM liters"

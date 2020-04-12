@@ -19,7 +19,7 @@ class UdpSpec extends mutable.Specification with InfluxDbContext[UdpSpec.Env] { 
   override val dbName: String = "_test_database_udp"
 
   override val env =
-    (http.Handle.create(defaultConfig()), Client.create(Client.Config("localhost", 8086)))
+    (http.Client.create(defaultConfig()), Client.create(Client.Config("localhost", 8086)))
       .mapN((_,_))
 
   "write" >> {
@@ -60,5 +60,5 @@ class UdpSpec extends mutable.Specification with InfluxDbContext[UdpSpec.Env] { 
   }
 }
 object UdpSpec {
-  type Env = (http.Handle, Client)
+  type Env = (HttpClient, Client)
 }

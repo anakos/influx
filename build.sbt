@@ -35,6 +35,11 @@ lazy val core =
         circe.core,
         circe.generic,
         circe.jawn,
+        circe.fs2,
+        sttp.core,
+        sttp.async_client,
+        sttp.async_client_cats,
+        sttp.async_client_fs2,
         cats.laws                % Test,
         cats.scalaCheck          % Test,
         "com.github.tomakehurst" % "wiremock" % "2.26.3" % Test
@@ -62,8 +67,8 @@ lazy val examples =
       libraryDependencies ++= List(
         "org.slf4j"      %  "slf4j-api"       % "1.7.30",
         "ch.qos.logback" %  "logback-classic" % "1.2.3",
-        "co.fs2"         %% "fs2-core"        % "2.3.0",
-        "co.fs2"         %% "fs2-io"          % "2.3.0"
+        fs2.core,
+        fs2.io
       )
     )
     .dependsOn(core, `cats-ext`)
