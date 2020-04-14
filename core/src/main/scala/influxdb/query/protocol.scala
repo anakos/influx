@@ -3,6 +3,7 @@ package query
 
 import cats.instances.all._
 import cats.syntax.either._
+import cats.syntax.foldable._
 import cats.syntax.traverse._
 import influxdb.query.types._
 import io.circe._
@@ -11,18 +12,44 @@ import scala.collection.immutable.ListMap
 object json {
   val parseResultsObject: Json => Decoder.Result[Vector[Json]] =
     _.hcursor.get[Vector[Json]]("results")
+  val parseSeriesObject: Json => Decoder.Result[Vector[Json]] =
+    js => js.hcursor.get[Vector[Json]]("series")
+      .orElse(parseResultsObject(js))
+      .orElse(Vector.empty.asRight)
   val parseSeriesObjectLenient: Json => Decoder.Result[Vector[Json]] =
     _.hcursor.getOrElse[Vector[Json]]("series")(Vector.empty)
-
+  def parseErrorAsDecodingFailure[A]: Json => Decoder.Result[A] =
+    js => Decoder[Failure].flatMap { case Failure(msg) => Decoder.failedWithMessage[A](msg) }
+      .apply(js.hcursor) 
   def parseSeriesBody[A : QueryResults](json: Json): Decoder.Result[Vector[A]] = {
     val csr = json.hcursor
     csr.as[SeriesBody]
       .flatMap { case SeriesBody(name, TagSet(tags), columns, values) =>
         values
-          .traverse { QueryResults[A].parseWithRaw(name, tags, columns, _) }
-          .leftMap { io.circe.DecodingFailure(_, csr.history) }
+          .traverse { values =>
+            QueryResults[A]
+              .parseWithRaw(name, tags, columns, values)
+              .leftMap { io.circe.DecodingFailure(_, csr.history) }
+          }
       }
   }
+
+  /**
+    * parse results JSON using the provided strategy.
+    *
+    * @param strategy 
+    * @param json
+    * @return
+    */
+  def parseResultsWithStrategy[A : influxdb.query.QueryResults](strategy: DecodingStrategy[A], json: Json): Decoder.Result[Vector[A]] =
+    parseResultsObject(json).flatMap {
+      _.foldMap { results =>
+        for {
+          series <- strategy.parseSeriesObject(results)
+          result <- series.flatTraverse(strategy.parseSeries)
+        } yield result
+      }  
+    }
 
   /**
     * parse results JSON. uses lenient parsing to skip non-series data (ie - errors, statements, anything else).
@@ -31,32 +58,31 @@ object json {
     * @return
     */
   def parseResults[A : influxdb.query.QueryResults](json: Json): Decoder.Result[Vector[A]] =
-    for {
-      results <- parseResultsObject(json)
-      series  <- results.traverse(parseSeriesObjectLenient)
-      values  <- series.flatten.traverse(parseSeriesBody[A])
-    } yield values.flatten
+    parseResultsWithStrategy[A](DecodingStrategy.lenient[A], json)
 
-  /**
-    * Series data decoder.
-    * 
-    * If non-series data is encountered (i.e. - statements, errors), it is simply ignored
-    *
-    * @param f
-    * @return
-    */
-  def resultsDecoder[A : QueryResults]: Decoder[Vector[A]] =
-    Decoder.instance[Vector[A]] { csr => parseResults(csr.value) }
+  def resultsDecoder[A : QueryResults](strategy: DecodingStrategy[A]): Decoder[Vector[A]] =
+    Decoder.instance[Vector[A]] { csr => parseResultsWithStrategy(strategy, csr.value) }
 
-  def decoder[A : QueryResults]: Decoder[Either[Failure, Vector[A]]] =
+  def decoder[A : QueryResults](strategy: DecodingStrategy[A]): Decoder[Either[Failure, Vector[A]]] =
     Decoder[Failure]
-      .either(resultsDecoder[A])
-  
-  def parseQueryResult[A : QueryResults](js: Json): Either[InfluxException, Vector[A]] =
-    decoder[A]
+      .either(resultsDecoder[A](strategy))
+
+  def parseQueryResultWithDecoder[A : QueryResults](strategy: DecodingStrategy[A], js: Json): Either[InfluxException, Vector[A]] =
+    decoder[A](strategy)
       .apply(js.hcursor)
       .leftMap { InfluxException.unexpectedResponse(js, _) }
       .flatMap { _.leftMap { _.toInfluxException() } }
+
+  /**
+    * parse results JSON using lenient parsing strategy, transforming decoding failures into an InfluxException.
+    * 
+    * this is the default means of parsing query results
+    *
+    * @param js
+    * @return
+    */
+  def parseQueryResult[A : QueryResults](js: Json): Either[InfluxException, Vector[A]] =
+    parseQueryResultWithDecoder[A](DecodingStrategy.lenient[A], js)
 }
 
 /**
@@ -104,4 +130,27 @@ final case class Failure(error: String) {
 object Failure {
   implicit val decoder: Decoder[Failure] =
     io.circe.generic.semiauto.deriveDecoder[Failure]
+}
+
+final case class DecodingStrategy[A](
+  parseSeriesObject: Json => Decoder.Result[Vector[Json]],
+  parseSeries      : Json => Decoder.Result[Vector[A]]
+)
+object DecodingStrategy {
+  /**
+    * This is the default strategy for consuming Query result from InfluxDB.
+    * Rather than failing when encountering non-series data, this will skip the unexpected result.
+    * 
+    * For example, the following response from InfluxDB will yield an empty collection:
+    *
+    * @return
+    */
+  def lenient[A : QueryResults]: DecodingStrategy[A] =
+    DecodingStrategy[A](json.parseSeriesObjectLenient, json.parseSeriesBody[A](_))
+  /**
+   * This strategy enforces strict parsing rules when consuming Query results from InfluxDB.
+   * Error messages are propagated as Decoding failures.
+   */ 
+  def strict[A : QueryResults]: DecodingStrategy[A] =
+    DecodingStrategy[A](json.parseSeriesObject, json.parseSeriesBody[A](_))
 }
