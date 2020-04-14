@@ -12,9 +12,9 @@ import org.specs2.mutable
 import scala.collection.immutable.ListMap
 
 class JsonSpec extends mutable.Specification {
-  "resultsDecoder" >> {
-    implicit val deriesResultdecoder: Decoder[Vector[SeriesResult]] =
-      JSON.resultsDecoder[SeriesResult]
+  "lenient results parsing" >> {
+    implicit val lenientDecoder: Decoder[Vector[SeriesResult]] =
+      JSON.resultsDecoder[SeriesResult](DecodingStrategy.lenient[SeriesResult])
 
     "returns valid series data as a single collection" >> {
       jawn.decode[Vector[SeriesResult]](
@@ -53,6 +53,19 @@ class JsonSpec extends mutable.Specification {
         case results => results must beEmpty
       }
     }    
+  }
+
+  "strict results parsing" >> {
+    implicit val strictDecoder: Decoder[Vector[SeriesResult]] =
+      JSON.resultsDecoder[SeriesResult](DecodingStrategy.strict[SeriesResult])
+
+    "stops at nested error messages" >> {
+      jawn.decode[Vector[SeriesResult]](
+        """{"results":[{"error":"database not found: _test"}]}"""
+      ) must beRight[Vector[SeriesResult]].like {
+        case results => results must beEmpty
+      }
+    }
   }
 
   "SeriesBody" >> {
