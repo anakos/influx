@@ -15,10 +15,11 @@ final case class TestMeasurement(time: Instant, value: Int)
 object TestMeasurement {
   implicit val parser: QueryResults[TestMeasurement] =
     new QueryResults[TestMeasurement] {
-      def parseWith(name: Option[String],
+      def parseWith(precision: Option[Precision],
+                    name: Option[String],
                     tags: ListMap[String, Value],
                     data: ListMap[String, Nullable]): Either[String, TestMeasurement] =
-        (Timestamp.validator("time"),
+        (Timestamp.validator("time", precision: Option[Precision]),
           FieldValidator.byName("value") { _.asNum() }
             .flatMapF(x => Either.catchNonFatal(x.toIntExact).leftMap { _ => s"too big for an int: $x"}))
           .mapN((ts, value) => TestMeasurement(ts.unwrap, value))
@@ -30,15 +31,16 @@ final case class MultiQueryExample(unwrap: Either[SubscriberInternal, WriteInter
 object MultiQueryExample {
   implicit val parser: QueryResults[MultiQueryExample] =
     new QueryResults[MultiQueryExample] {
-      def parseWith(name: Option[String],
+      def parseWith(precision: Option[Precision],
+                    name: Option[String],
                     tags: ListMap[String, Value],
                     data: ListMap[String, Nullable]): Either[String, MultiQueryExample] =
         QueryResults[SubscriberInternal]
-          .parseWith(name, tags, data)
+          .parseWith(precision, name, tags, data)
           .map(_.asLeft)
           .orElse(
             QueryResults[WriteInternal]
-              .parseWith(name, tags, data)
+              .parseWith(precision, name, tags, data)
               .map(_.asRight)
           )
           .map(MultiQueryExample(_))
@@ -54,10 +56,11 @@ final case class SubscriberInternal(
 object SubscriberInternal {
   implicit val parser: QueryResults[SubscriberInternal] =
     new QueryResults[SubscriberInternal] {
-      def parseWith(name: Option[String],
+      def parseWith(precision: Option[Precision],
+                    name: Option[String],
                     tags: ListMap[String, Value],
                     data: ListMap[String, Nullable]): Either[String, SubscriberInternal] =
-        (Timestamp.validator("time").map(_.unwrap),
+        (Timestamp.validator("time", precision).map(_.unwrap),
           FieldValidator.byName("createFailures") { _.asLong() },
           FieldValidator.byName("hostname") { _.asString() },
           FieldValidator.byName("pointsWritten") { _.asLong() },
@@ -83,10 +86,11 @@ final case class WriteInternal(
 object WriteInternal {
   implicit val parser: QueryResults[WriteInternal] =
     new QueryResults[WriteInternal] {
-      def parseWith(name: Option[String],
+      def parseWith(precision: Option[Precision],
+                    name: Option[String],
                     tags: ListMap[String, Value],
                     data: ListMap[String, Nullable]): Either[String, WriteInternal] =
-        (Timestamp.validator("time").map(_.unwrap),
+        (Timestamp.validator("time", precision).map(_.unwrap),
           FieldValidator.byName("hostname") { _.asString() },
           FieldValidator.byName("pointReq") { _.asLong() },
           

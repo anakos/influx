@@ -14,7 +14,7 @@ import scala.collection.immutable.ListMap
 class JsonSpec extends mutable.Specification {
   "lenient results parsing" >> {
     implicit val lenientDecoder: Decoder[Vector[SeriesResult]] =
-      JSON.resultsDecoder[SeriesResult](DecodingStrategy.lenient[SeriesResult])
+      JSON.resultsDecoder[SeriesResult](DecodingStrategy.lenient[SeriesResult](None))
 
     "returns valid series data as a single collection" >> {
       jawn.decode[Vector[SeriesResult]](
@@ -57,7 +57,7 @@ class JsonSpec extends mutable.Specification {
 
   "strict results parsing" >> {
     implicit val strictDecoder: Decoder[Vector[SeriesResult]] =
-      JSON.resultsDecoder[SeriesResult](DecodingStrategy.strict[SeriesResult])
+      JSON.resultsDecoder[SeriesResult](DecodingStrategy.strict[SeriesResult](None))
 
     "stops at nested error messages" >> {
       jawn.decode[Vector[SeriesResult]](
@@ -130,7 +130,7 @@ final case class SeriesResult(name: String, tag: String)
 object SeriesResult {
   implicit val queryResults: QueryResults[SeriesResult] = 
     new QueryResults[SeriesResult] {
-      def parseWith(name: Option[String], tags: ListMap[String, Value], fields: ListMap[String, Nullable]) =
+      def parseWith(_precision: Option[Precision], name: Option[String], tags: ListMap[String, Value], fields: ListMap[String, Nullable]) =
         (FieldValidator.byName("name") { _.asString() }.run(fields),
             tags.get("tag")
               .toRight("no tag in result")

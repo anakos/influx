@@ -8,7 +8,7 @@ import influxdb.manage._
 import influxdb.query.{DB => ReadDB}
 import influxdb.write.{DB => WriteDB}
 import influxdb.write._
-import influxdb.write.Parameter.{Consistency, Precision}
+import influxdb.write.Parameter.Consistency
 
 import org.specs2.mutable
 

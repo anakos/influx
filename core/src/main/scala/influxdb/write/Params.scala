@@ -1,15 +1,16 @@
 package influxdb.write
 
+import influxdb.Precision
 import cats.syntax.option._
 
 final case class Params(
   dbName: String,
   points: String,
-  precision: Option[Parameter.Precision],
+  precision: Option[Precision],
   consistency: Option[Parameter.Consistency],
   retentionPolicy: Option[String]
 ) { self =>
-  def withPrecision(precision: Parameter.Precision): Params =
+  def withPrecision(precision: Precision): Params =
     self.copy(precision = precision.some)
   def withConsistency(consistency: Parameter.Consistency): Params =
     self.copy(consistency = consistency.some)

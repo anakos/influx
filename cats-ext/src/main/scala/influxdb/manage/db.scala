@@ -24,7 +24,8 @@ final case class DbName(unwrap: String)
 object DbName {
   implicit val parser: QueryResults[DbName] =
     new QueryResults[DbName] {
-      def parseWith(name: Option[String],
+      def parseWith(_precision: Option[Precision],
+                    name: Option[String],
                     tags: ListMap[String, Value],
                     data: ListMap[String, Nullable]): Either[String, DbName] =
         DbName(data.get("name").flatMap { _.asString() }.getOrElse(""))

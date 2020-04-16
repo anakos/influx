@@ -1,4 +1,4 @@
-FROM influxdb:1.7-alpine
+FROM influxdb:1.8-alpine
 
 ENV INFLUXDB_HTTP_AUTH_ENABLED="true" \
     INFLUXDB_ADMIN_USER="influx_user" \
