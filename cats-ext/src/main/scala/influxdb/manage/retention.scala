@@ -105,7 +105,8 @@ object RetentionPolicy {
   
   implicit val parser: QueryResults[RetentionPolicy] =
     new QueryResults[RetentionPolicy] {
-      def parseWith(name  : Option[String],
+      def parseWith(_precision: Option[Precision],
+                    name  : Option[String],
                     tags  : ListMap[String, Value],
                     fields: ListMap[String, Nullable]): Either[String, RetentionPolicy] =
         (FieldValidator.byName("name") { _.asString() },

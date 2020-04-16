@@ -30,7 +30,7 @@ object DB {
         _.content
          .map { x => Chunk.byteBuffer(x) }
          .through(StreamingParser.byteArrayParserC[IO])
-         .evalMap(js => IO.fromEither(JSON.parseQueryResult[A](js)))
+         .evalMap(js => IO.fromEither(JSON.parseQueryResult[A](js, params.precision)))
          .flatMap(Stream.emits(_))
          .translate(LiftIO.liftK[RIO[E, ?]])
       }
@@ -45,7 +45,7 @@ object DB {
     IO.fromEither {
       jawn.parse(response.content)
         .leftMap { InfluxException.unexpectedResponse(params, response.content, _) }
-        .flatMap { JSON.parseQueryResult[A](_) }
+        .flatMap { JSON.parseQueryResult[A](_, params.precision) }
     }
 
   private def withErrorHandling[E, A]: RIO[E, A] => RIO[E, A] =

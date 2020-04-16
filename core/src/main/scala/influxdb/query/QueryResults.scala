@@ -5,6 +5,7 @@ import cats.syntax.applicative._
 import cats.syntax.either._
 import cats.syntax.flatMap._
 import scala.collection.immutable.ListMap
+import influxdb.Precision
 import influxdb.query.types._
 
 /**
@@ -12,16 +13,18 @@ import influxdb.query.types._
   * TODO: are tags still a thing?
   */
 trait QueryResults[A] {
-  def parseWith(name  : Option[String],
-                tags  : ListMap[String, Value],
-                fields: ListMap[String, Nullable]): Either[String, A]
+  def parseWith(precision: Option[Precision],
+                name     : Option[String],
+                tags     : ListMap[String, Value],
+                fields   : ListMap[String, Nullable]): Either[String, A]
 
-  def parseWithRaw(name   : Option[String],
-                   tags   : ListMap[String, Value],
-                   columns: Vector[String],
-                   values : Vector[Nullable]): Either[String, A] =
+  def parseWithRaw(precision: Option[Precision],
+                   name     : Option[String],
+                   tags     : ListMap[String, Value],
+                   columns  : Vector[String],
+                   values   : Vector[Nullable]): Either[String, A] =
     validateFields(columns, values)
-      .flatMap { parseWith(name, tags, _) }
+      .flatMap { parseWith(precision, name, tags, _) }
 
   def validateFields(columns: Vector[String], values: Vector[Nullable]): Either[String, ListMap[String, Nullable]] =
     s"mismatched number of columns [${columns.size}] and values [${values.size}]"
@@ -34,9 +37,10 @@ object QueryResults {
   
   implicit val unit: QueryResults[Unit] =
     new QueryResults[Unit] {
-      def parseWith(name   : Option[String],
-                    tags   : scala.collection.immutable.ListMap[String, Value],
-                    fields: ListMap[String, Nullable]): Either[String, Unit] =
+      def parseWith(precision: Option[Precision],
+                    name     : Option[String],
+                    tags     : scala.collection.immutable.ListMap[String, Value],
+                    fields   : ListMap[String, Nullable]): Either[String, Unit] =
         ().asRight[String]
     }
 }

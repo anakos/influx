@@ -4,7 +4,6 @@ import cats._
 import cats.effect._
 import cats.instances.all._
 import cats.syntax.apply._
-import cats.syntax.either._
 import cats.syntax.show._
 import influxdb.query
 import influxdb.query.{DB, QueryResults}
@@ -12,6 +11,8 @@ import influxdb.query.types._
 import java.time.Instant
 import scala.collection.immutable.ListMap
 import influxdb.query.FieldValidator
+import influxdb.Precision
+import influxdb.Timestamp
 
 object Queries {
   def mkParams(q: String): query.Params =
@@ -44,6 +45,7 @@ object MeasurementName {
   implicit val parser: QueryResults[MeasurementName] =
     new QueryResults[MeasurementName] {
       override def parseWith(
+        _precision: Option[Precision],
         name: Option[String],
         tags: ListMap[String, Value],
         data: ListMap[String, Nullable]
@@ -62,7 +64,8 @@ object Count {
 
   implicit val parser: QueryResults[Count] =
     new QueryResults[Count] {
-      def parseWith(name: Option[String],
+      def parseWith(_precision: Option[Precision], 
+                    name: Option[String],
                     tags: ListMap[String, Value],
                     data: ListMap[String, Nullable]): Either[String, Count] =
         FieldValidator.byName("count") { _.asNum().map(x => Count(x.toLong)) }
@@ -75,12 +78,8 @@ final case class SeaLevel(time: Instant, description: String, location: String, 
 }
 object SeaLevel {
 
-  val requireTime =
-    FieldValidator.byName("time") { _.asString() }
-      .flatMapF { x =>
-        Either.catchNonFatal(java.time.Instant.parse(x))
-          .leftMap(ex => s"could not decode timestamp: ${ex.getMessage}")
-      }
+  def requireTime(precision: Option[Precision]) =
+    Timestamp.validator("time", precision).map(_.unwrap)
 
   val requireDescription =
     FieldValidator.byName("level description") { _.asString() }
@@ -93,10 +92,11 @@ object SeaLevel {
 
   implicit val parser: QueryResults[SeaLevel] =
     new QueryResults[SeaLevel] {
-      def parseWith(name: Option[String],
+      def parseWith(precision: Option[Precision], 
+                    name: Option[String],
                     tags: ListMap[String, Value],
                     data: ListMap[String, Nullable]): Either[String, SeaLevel] =
-        (requireTime, requireDescription, requireLocation, requireLevel)
+        (requireTime(precision), requireDescription, requireLocation, requireLevel)
           .mapN(SeaLevel(_,_,_,_))
           .run(data)
     }

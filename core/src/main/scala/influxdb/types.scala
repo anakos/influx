@@ -4,20 +4,15 @@ import atto._, Atto._
 import cats.instances.all._
 import cats.syntax.all._
 import java.time.Instant
+import java.util.concurrent.TimeUnit
 import scala.concurrent.duration._
 import influxdb.query.FieldValidator
 
-
-// TODO: revisit this. it would be gereat to be able to have a type parameter handle the dispatch of the correct precision parser
 final class Timestamp private(val unwrap: Instant)
 object Timestamp {
-  def validator(fieldName: String): FieldValidator.Validator[Timestamp] =
-    epochMillisValidator(fieldName).orElse(rfc3339UTCValidator(fieldName))
+  def validator(fieldName: String, precision: Option[Precision]): FieldValidator.Validator[Timestamp] =
+    precision.fold(rfc3339UTCValidator(fieldName)) { timeValidator(fieldName, _) }
       .map { new Timestamp(_) }
-
-  def epochMillisValidator(fieldName: String): FieldValidator.Validator[Instant] =
-    FieldValidator.byName(fieldName) { _.asNum() }
-      .flatMapF { toEpochMillis(_) }
 
   def rfc3339UTCValidator(fieldName: String): FieldValidator.Validator[Instant] =
     FieldValidator.byName(fieldName) { _.asString() }
@@ -26,10 +21,30 @@ object Timestamp {
   def parseRFC3339UTC(value: String): Either[String, Instant] =
     Either.catchNonFatal(java.time.Instant.parse(value))
       .leftMap { ex => s"could not decode timestamp [$value]: ${ex.getMessage}" }
-  
-  def toEpochMillis(value: BigDecimal): Either[String, Instant] =
-    Either.catchNonFatal(Instant.ofEpochMilli(value.toLongExact))
-      .leftMap { ex => s"could not convert $value to long: ${ex.getMessage}" }
+
+  def timeValidator(fieldName: String, precision: Precision): FieldValidator.Validator[Instant] =
+    FieldValidator.byName(fieldName) { _.asNum() }
+      .flatMapF { parseInstant(_, precision) }
+
+  def parseInstant(value: BigDecimal, precision: Precision): Either[String, Instant] =
+    Either.catchNonFatal {
+      val timestamp = value.toLongExact
+      precision match {
+        case Precision.NANOSECONDS  =>
+          Instant.ofEpochMilli(TimeUnit.NANOSECONDS.toMillis(timestamp))
+        case Precision.MICROSECONDS =>
+          Instant.ofEpochMilli(TimeUnit.MICROSECONDS.toMillis(timestamp))
+        case Precision.MILLISECONDS =>
+          Instant.ofEpochMilli(timestamp)
+        case Precision.SECONDS      =>
+          Instant.ofEpochSecond(timestamp)
+        case Precision.MINUTES      =>
+          Instant.ofEpochSecond(TimeUnit.MINUTES.toSeconds(timestamp))
+        case Precision.HOURS        =>
+          Instant.ofEpochSecond(TimeUnit.HOURS.toSeconds(timestamp))
+      }
+    }
+    .leftMap(ex => s"could not convert $value to long: ${ex.getMessage}")
 }
 
 final class Natural private(val value: Long) {
@@ -82,4 +97,17 @@ object DurationLiteral {
         ex => s"$value could not be parsed as a valid duration: $ex",
         x => new DurationLiteral(x.combineAll)
       )
+}
+
+sealed abstract class Precision(str: String) extends Product with Serializable {
+  override def toString = str
+}
+object Precision {
+  case object NANOSECONDS extends Precision("ns")
+  case object MICROSECONDS extends Precision("u")
+  case object MILLISECONDS extends Precision("ms")
+  case object SECONDS extends Precision("s")
+  case object MINUTES extends Precision("m")
+  case object HOURS extends Precision("h")
+  //case object RFC3339 extends Precision("rfc3339")
 }

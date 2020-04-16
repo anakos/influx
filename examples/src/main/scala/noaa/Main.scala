@@ -55,6 +55,7 @@ object Main extends IOApp {
 
     } yield ()
 }
+
 /*
 curl -G 'http://localhost:8086/query' --data-urlencode "db=NOAA_water_database" \
   --data-urlencode "chunked=true" \

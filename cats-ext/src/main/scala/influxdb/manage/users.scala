@@ -57,7 +57,8 @@ object User {
 
   implicit val parser: QueryResults[User] =
     new QueryResults[User] {
-      def parseWith(name  : Option[String],
+      def parseWith(_precision: Option[Precision],
+                    name  : Option[String],
                     tags  : ListMap[String, Value],
                     fields: ListMap[String, Nullable]): Either[String, User] =
         (fields.get("user").flatMap(_.asString()), fields.get("admin").flatMap(_.asBool()))

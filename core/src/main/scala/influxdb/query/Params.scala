@@ -2,8 +2,7 @@ package influxdb.query
 
 import cats._
 import cats.syntax.option._
-import influxdb.write.Parameter.Precision
-import influxdb.Natural
+import influxdb.{Natural, Precision}
 
 final case class Params(query: List[String], dbName: Option[String], precision: Option[Precision]) {
   def toMap(): Map[String, String] =

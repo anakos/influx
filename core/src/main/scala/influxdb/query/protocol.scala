@@ -21,14 +21,14 @@ object json {
   def parseErrorAsDecodingFailure[A]: Json => Decoder.Result[A] =
     js => Decoder[Failure].flatMap { case Failure(msg) => Decoder.failedWithMessage[A](msg) }
       .apply(js.hcursor) 
-  def parseSeriesBody[A : QueryResults](json: Json): Decoder.Result[Vector[A]] = {
+  def parseSeriesBody[A : QueryResults](json: Json, precision: Option[Precision]): Decoder.Result[Vector[A]] = {
     val csr = json.hcursor
     csr.as[SeriesBody]
       .flatMap { case SeriesBody(name, TagSet(tags), columns, values) =>
         values
           .traverse { values =>
             QueryResults[A]
-              .parseWithRaw(name, tags, columns, values)
+              .parseWithRaw(precision, name, tags, columns, values)
               .leftMap { io.circe.DecodingFailure(_, csr.history) }
           }
       }
@@ -57,8 +57,8 @@ object json {
     * @param content
     * @return
     */
-  def parseResults[A : influxdb.query.QueryResults](json: Json): Decoder.Result[Vector[A]] =
-    parseResultsWithStrategy[A](DecodingStrategy.lenient[A], json)
+  def parseResults[A : influxdb.query.QueryResults](json: Json, precision: Option[Precision]): Decoder.Result[Vector[A]] =
+    parseResultsWithStrategy[A](DecodingStrategy.lenient[A](precision), json)
 
   def resultsDecoder[A : QueryResults](strategy: DecodingStrategy[A]): Decoder[Vector[A]] =
     Decoder.instance[Vector[A]] { csr => parseResultsWithStrategy(strategy, csr.value) }
@@ -81,8 +81,8 @@ object json {
     * @param js
     * @return
     */
-  def parseQueryResult[A : QueryResults](js: Json): Either[InfluxException, Vector[A]] =
-    parseQueryResultWithDecoder[A](DecodingStrategy.lenient[A], js)
+  def parseQueryResult[A : QueryResults](js: Json, precision: Option[Precision]): Either[InfluxException, Vector[A]] =
+    parseQueryResultWithDecoder[A](DecodingStrategy.lenient[A](precision), js)
 }
 
 /**
@@ -145,12 +145,12 @@ object DecodingStrategy {
     *
     * @return
     */
-  def lenient[A : QueryResults]: DecodingStrategy[A] =
-    DecodingStrategy[A](json.parseSeriesObjectLenient, json.parseSeriesBody[A](_))
+  def lenient[A : QueryResults](precision: Option[Precision]): DecodingStrategy[A] =
+    DecodingStrategy[A](json.parseSeriesObjectLenient, json.parseSeriesBody[A](_, precision))
   /**
    * This strategy enforces strict parsing rules when consuming Query results from InfluxDB.
    * Error messages are propagated as Decoding failures.
    */ 
-  def strict[A : QueryResults]: DecodingStrategy[A] =
-    DecodingStrategy[A](json.parseSeriesObject, json.parseSeriesBody[A](_))
+  def strict[A : QueryResults](precision: Option[Precision]): DecodingStrategy[A] =
+    DecodingStrategy[A](json.parseSeriesObject, json.parseSeriesBody[A](_, precision))
 }
