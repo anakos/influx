@@ -24,7 +24,7 @@ lazy val root = (project in file("."))
     publishLocal    := {},
     publishArtifact := false,
   )
-  .aggregate(core, `cats-ext`, examples)
+  .aggregate(core, `cats-ext`, `examples-cats`, `zio-ext`, `examples-zio`, `examples-app-data`)
 
 lazy val core =
   mkProject("core")
@@ -35,10 +35,8 @@ lazy val core =
         circe.generic,
         circe.jawn,
         sttp.core,
-        sttp.async_client_fs2    % Test,
         cats.effect              % Test,
         cats.scalaCheck          % Test,
-        "com.github.tomakehurst" % "wiremock" % "2.26.3" % Test
       )
     )
     
@@ -54,28 +52,49 @@ lazy val `cats-ext` =
         sttp.async_client,
         sttp.async_client_cats,
         sttp.async_client_fs2,
+        "com.github.tomakehurst" % "wiremock" % "2.26.3" % Test,
         specs2.cats % IntegrationTest,
         specs2.core % IntegrationTest,
       )
     ).dependsOn(core)
 
-lazy val examples =
-  mkProject("examples")
+lazy val `zio-ext` =
+  mkProject("zio-ext")
+    // .configs(IntegrationTest)
     .settings(
-      publish         := {},
-      publishLocal    := {},
-      publishArtifact := false,
+      // Defaults.itSettings,
+      // testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
       libraryDependencies ++= List(
-        "org.slf4j"      %  "slf4j-api"       % "1.7.30",
-        "ch.qos.logback" %  "logback-classic" % "1.2.3",
+        zio.core,
+        zio.interop,
+        zio.streams,
+        sttp.async_client_zio,
+        sttp.async_client_zio_streams,
+        "com.github.tomakehurst" % "wiremock" % "2.26.3" % Test,
+        // specs2.core % IntegrationTest,
+      )
+    ).dependsOn(core)
+
+lazy val `examples-cats` =
+  exampleProject("cats-app")
+    .settings(
+      libraryDependencies ++= List(
         fs2.core,
         fs2.io
       )
     )
-    .dependsOn(core, `cats-ext`)
+    .dependsOn(core, `cats-ext`, `examples-app-data`)
 
-def mkProject(id: String) =
-  Project(s"influxdb-$id", file(s"$id"))
+lazy val `examples-zio` =
+  exampleProject("zio-app")
+    .dependsOn(core, `zio-ext`, `examples-app-data`)
+
+lazy val `examples-app-data` =
+  exampleProject("app-data")
+    .dependsOn(core)
+
+def mkProject(id: String, baseDir: Option[String] = None) =
+  Project(s"influxdb-$id", file(id))
     .settings(
       libraryDependencies ++= List(        
         cats.core,
@@ -84,5 +103,18 @@ def mkProject(id: String) =
         specs2.discipline    % Test,
         specs2.scalaCheck    % Test,
         ScalaCheck.core      % Test,
+      )
+    )
+
+def exampleProject(id: String) =
+  Project(s"influxdb-examples-$id", file(s"examples/$id"))
+    .settings(
+      publish         := {},
+      publishLocal    := {},
+      publishArtifact := false,
+      libraryDependencies ++= List(
+        cats.core,
+        "org.slf4j"      %  "slf4j-api"       % "1.7.30",
+        "ch.qos.logback" %  "logback-classic" % "1.2.3"
       )
     )

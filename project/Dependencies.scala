@@ -53,10 +53,22 @@ object Dependencies {
     def mkModule(name: String) =
       "com.softwaremill.sttp.client" %% name % "2.0.7"
 
-    val core              = mkModule("core")
-    val async_client      = mkModule("async-http-client-backend")
-    val async_client_cats = mkModule("async-http-client-backend-cats")
-    val async_client_fs2  = mkModule("async-http-client-backend-fs2")
-    
+    val core                     = mkModule("core")
+    val async_client             = mkModule("async-http-client-backend")
+    val async_client_cats        = mkModule("async-http-client-backend-cats")
+    val async_client_fs2         = mkModule("async-http-client-backend-fs2")
+    val async_client_zio         = mkModule("async-http-client-backend-zio")
+    val async_client_zio_streams = mkModule("async-http-client-backend-zio-streams")
+  }
+
+  object zio {
+    def mkModule(name: String) =
+      "dev.zio" %% name % "1.0.0-RC18-2"
+
+    val core     = mkModule("zio")
+    val interop  = "dev.zio" %% "zio-interop-cats" % "2.0.0.0-RC12"
+    val streams  = mkModule("zio-streams")
+    val test     = mkModule("zio-test")
+    val test_sbt = mkModule("zio-test-sbt")
   }
 }
