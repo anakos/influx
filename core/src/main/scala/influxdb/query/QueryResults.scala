@@ -34,7 +34,7 @@ trait QueryResults[A] {
 object QueryResults {
   def apply[A](implicit qr: QueryResults[A]): QueryResults[A] =
     qr
-  
+
   implicit val unit: QueryResults[Unit] =
     new QueryResults[Unit] {
       def parseWith(precision: Option[Precision],

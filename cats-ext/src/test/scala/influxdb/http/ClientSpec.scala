@@ -62,9 +62,8 @@ class ClientSpec extends mutable.Specification with AfterAll with IOMatchers {
 
       ClientSpec.get(http.Config.defaultHttp("localhost", 64011))
         .unsafeRunSync() must beLeft[Throwable].like {
-          case HttpException(_,code) => code must beSome[Int].like {
-            case code => code must_=== 500
-          }
+          case InfluxException.ServerError(msg) =>
+            msg must contain("[status code = 500]")
         }
     }
   }
@@ -113,9 +112,6 @@ class ClientSpec extends mutable.Specification with AfterAll with IOMatchers {
 }
 object ClientSpec {
   import cats.effect._
-  import org.asynchttpclient.DefaultAsyncHttpClientConfig
-  import sttp.client.asynchttpclient.fs2.AsyncHttpClientFs2Backend
-  import sttp.client.impl.cats.implicits._
   
   val path = "/query"
 
@@ -134,13 +130,7 @@ object ClientSpec {
       .unsafeRunSync()
 
   def get(config: http.Config)(implicit cs: ContextShift[IO]): IO[Either[Throwable, HttpResponse[String]]] =
-    AsyncHttpClientFs2Backend.resourceUsingConfig[IO] {
-        val builder = new DefaultAsyncHttpClientConfig.Builder().setUseInsecureTrustManager(true)
-        
-        config.client.connectTimeout.fold(builder) { builder.setConnectTimeout(_) }
-          .build()
-      }
-      .map { new Client[IO, fs2.Stream[IO, java.nio.ByteBuffer]](config.connect, _) }
+    influxdb.http.Client.create(config.copy(client = config.client.setAcceptAnyCertificate(true)))
       .use { _.get(path, Map.empty) }
-      .attempt
+      .attempt    
 }

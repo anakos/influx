@@ -1,40 +1,16 @@
 package noaa
 
 import cats._
-import cats.effect._
 import cats.instances.all._
 import cats.syntax.apply._
 import cats.syntax.show._
-import influxdb.query
-import influxdb.query.{DB, QueryResults}
+import influxdb.query.QueryResults
 import influxdb.query.types._
 import java.time.Instant
 import scala.collection.immutable.ListMap
 import influxdb.query.FieldValidator
 import influxdb.Precision
 import influxdb.Timestamp
-
-object Queries {
-  def mkParams(q: String): query.Params =
-    query.Params.singleQuery(q, DEFAULT_DB_NAME)
-
-  def getMeasurements(): App[Vector[MeasurementName]] =
-    DB.query[Env, MeasurementName](mkParams("SHOW measurements"))
-
-  def countNonNullValues(fieldName: String, measurementName: String): App[Long] =
-    DB.query[Env, Count](mkParams(s"""SELECT COUNT("$fieldName") FROM $measurementName"""))
-      .flatMapF {
-        case Vector(Count(x)) =>
-          IO.pure(x)
-        case results          =>
-          IO.raiseError(new RuntimeException(s"expected singleton list, got: ${results.mkString(", ")}"))
-      }
-
-  def selectFirstFiveObs[A : QueryResults](measurementName: String): App[Vector[A]] =
-    DB.query[Env, A](mkParams(s"""SELECT * FROM $measurementName LIMIT 5"""))
-
-  def showTags(measurementName: String): App[List[String]] = ???
-}
 
 final case class MeasurementName(unwrap: String) {
   override def toString() = this.show

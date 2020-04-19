@@ -10,7 +10,7 @@ object InfluxException {
   final case class ServerError(msg: String) extends InfluxException(msg)
   final case class ClientError(msg: String) extends InfluxException(msg)
   /** This branch represents json that cannot be deserialized properly or weird response codes */
-  final case class UnexpectedResponse(msg: String, content: String) extends InfluxException(msg)
+  final case class UnexpectedResponse(msg: String, content: String) extends InfluxException(s"$msg: $content")
   final case class HttpException(msg: String, code: Option[Int]) extends InfluxException(msg)
 
   def httpException(msg: String, code: Int): InfluxException =
@@ -29,6 +29,9 @@ object InfluxException {
 
   def unexpectedResponse(content: Json, ex: Throwable): InfluxException =
     withUnderlying(UnexpectedResponse("could not decode query results", content.noSpaces), ex)
+
+  def unexpectedResponse(content: String, ex: Throwable): InfluxException =
+    withUnderlying(UnexpectedResponse("could not decode query results", content), ex)
 
   def withUnderlying[A <: Throwable](a: A, underlying: Throwable): A =
     a.initCause(underlying)

@@ -1,8 +1,6 @@
 package influxdb
 
 package object http {
-  import sttp.client.impl.cats.implicits._
-
   def get[A](path: String, params: Map[String, String])
             (implicit has: Has[A]): RIO[A, HttpResponse.Text] =
     has.using(_.get(path, params))

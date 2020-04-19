@@ -4,8 +4,9 @@ import cats.syntax.apply._
 import cats.syntax.applicativeError._
 import cats.syntax.flatMap._
 
+import influxdb.http.{Client => HttpClient}
 import influxdb.manage._
-import influxdb.query.{DB => ReadDB}
+import influxdb.query.{ChunkSize, DB => ReadDB}
 import influxdb.write.{DB => WriteDB}
 import influxdb.write._
 import influxdb.write.Parameter.Consistency
@@ -13,14 +14,13 @@ import influxdb.write.Parameter.Consistency
 import org.specs2.mutable
 
 import scala.concurrent.duration._
-import influxdb.query.ChunkSize
 
 class DatabaseSpec extends mutable.Specification with InfluxDbContext[HttpClient] {
   sequential
   
   override val dbName = "_test_database_db"
 
-  override val env = InfluxDB.create(defaultConfig())
+  override val env = HttpClient.create(defaultConfig())
 
   "manage.db" >> {
     "show existing database" >> { client: HttpClient =>
