@@ -24,7 +24,7 @@ This project consists of the following modules:
 
 - core    : defines the core data structures for interacting with InfluxDb
 - cats-ext: extends the core with helper methods that interact with InfluxDb, and are structured using [`ReaderT over IO`](https://www.fpcomplete.com/blog/2017/06/readert-design-pattern). This code depends on both cats-effect and fs2. 
-- zio-ext:  extends the core with helper methods that interact with InfluxDb defined in terms of ZIO andZIO-Streams.
+- zio-ext:  extends the core with helper methods that interact with InfluxDb defined in terms of ZIO and ZIO-Streams.
 
 See individual READMEs for a deeper dive on structure. As an aside, I've tried to design this for qualified import (see: https://jaspervdj.be/posts/2018-03-08-handle-pattern.html) and will be revisiting the overall structure to ensure that this goal has been met.
 
